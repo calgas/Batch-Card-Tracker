@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
-<meta name="app-version" content="1.2.0">
+<meta name="app-version" content="1.3.0">
 <meta name="theme-color" content="#15181d">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -602,7 +602,7 @@
    behind the figures already on screen.
    ========================================================================= */
 
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.3.0';
 const BCT_API_URL = 'https://script.google.com/macros/s/AKfycbxdCU4dK92I_Q5mlzhp9cEw_efeX5bVfkfLfqbNf_5eDpyj1RljUh0WqO-Y5-t3RhNZ/exec';
 const STOCK_API_URL = 'https://script.google.com/macros/s/AKfycbzs_aW0G-NvVvs-_Yk41d4esq1lkKVBTzQEQTrbbIKe7kQfoYdXD3cuhd6Wt2UQ6MU0/exec';
 const APP_URL = 'https://calgas.github.io/Batch-Card-Tracker/';
@@ -810,6 +810,29 @@ function pastCards(stageKey, batchNo, wide) {
   const sameV = volt ? all.filter(c => partOf(c.Batch_No) !== pc && voltOf(c.Batch_No) === volt) : [];
   return same.concat(sameV, all.filter(c => partOf(c.Batch_No) !== pc && (!volt || voltOf(c.Batch_No) !== volt)));
 }
+// Serial numbers: a prefix and a running number, K0001 (K = November).
+// Each part code's series runs on through the month, batch after batch.
+const SERIAL_MONTHS = 'ABCDEFGHIJKL';
+function parseSerial(v) { const m = String(v || '').toUpperCase().match(/^(.*?)(\d+)$/); return m ? { prefix: m[1], num: Number(m[2]), width: m[2].length } : null; }
+function serialAt(from, off) { const p = parseSerial(from); if (!p) return ''; let n = String(p.num + off); while (n.length < p.width) n = '0' + n; return p.prefix + n; }
+function serialCount(from, to) { const a = parseSerial(from), b = parseSerial(to); return a && b && a.prefix === b.prefix && b.num >= a.num ? b.num - a.num + 1 : 0; }
+function nextSerial(batchNo) {
+  const b = S.batchBy[batchNo], part = String(b && b.Part_Code || '').toUpperCase(), now = new Date();
+  let best = null;
+  (S.D.cards.TPK || []).forEach(c => {
+    if (c.Batch_No === batchNo || blankV(c.Serial_From)) return;
+    const cb = S.batchBy[c.Batch_No];
+    if (!cb || String(cb.Part_Code).toUpperCase() !== part) return;
+    const d = new Date(cardTime(c));
+    if (d.getFullYear() !== now.getFullYear() || d.getMonth() !== now.getMonth()) return;
+    const t = parseSerial(c.Serial_To || c.Serial_From);
+    if (t && (!best || t.num > best.t.num)) best = { t, c };
+  });
+  if (best) return { v: serialAt(best.c.Serial_To || best.c.Serial_From, 1), src: 'After ' + best.c.Batch_No };
+  return { v: SERIAL_MONTHS[now.getMonth()] + '0001', src: 'New month' };
+}
+function receiptOf(batchNo) { return S.D.orders && S.D.orders.receipts ? S.D.orders.receipts[String(batchNo).toUpperCase()] || null : null; }
+const OD_URL = 'https://calgas.github.io/Production-Tracker/';
 function pastValue(stageKey, batchNo, key, wide) {
   const c = pastCards(stageKey, batchNo, wide).find(x => !blankV(x[key]));
   return c ? { v: c[key], from: c.Batch_No } : null;
@@ -1042,6 +1065,7 @@ function parseRoute() {
   const [page, arg, extra] = h.split('/').map(decodeURIComponent);
   if (page === 'batch' && arg) return { page: 'batch', batchNo: arg, card: extra };
   if (page === 'stage' && arg) return { page: 'stage', key: arg };
+  if (page === 'new') return { page: 'new' };
   const known = ['overview', 'batches', 'pqa', 'stages', 'dropdowns', 'more', 'apps', 'about', 'feedback'];
   return { page: known.indexOf(page) > -1 ? page : 'overview' };
 }
@@ -1081,6 +1105,21 @@ function setTitle(crumb, title) {
 function render() {
   if (!S.D) return;
   S.route = parseRoute();
+  if (S.route.page === 'new') {
+    // From Orders & Dispatch: "Open batch" for an order line.
+    const q = new URLSearchParams(location.hash.split('?')[1] || '');
+    const line = ((S.D.orders && S.D.orders.lines) || []).find(l => l.lineId === q.get('line'));
+    const want = line ? String(line.fgCode).toUpperCase() : '';
+    const prod = line ? S.D.products.find(p => String(p.Stock_FG_Code || '').toUpperCase() === want) || S.D.products.find(p => String(p.Part_Code).toUpperCase() === want) : null;
+    history.replaceState(null, '', '#/batches');
+    S.route = parseRoute();
+    setTimeout(() => {
+      if (!S.D.can.create) { toast('You don’t have access to create batches.', true); return; }
+      if (q.get('line') && !line) toast('That order line isn’t open any more.', true);
+      openBatchForm(null, { part: prod ? prod.Part_Code : '', line: line ? line.lineId : '' });
+      if (line && !prod) toast('No product here for ' + line.fgCode + '. Add it under Dropdowns → Products with Stock FG code ' + line.fgCode + '.', true);
+    }, 60);
+  }
   renderNav();
   const r = S.route, c = $('#content');
   $('#backBtn').classList.toggle('hidden', r.page !== 'batch');
@@ -1451,7 +1490,6 @@ function renderBatch(r) {
   if (i.open && !i.hold && i.toRecord && can.stages[st.key]) acts.push(`<button class="btn btn-primary" data-act="record" data-b="${esc(b.Batch_No)}" data-s="${st.key}">${ico('plus')}Record ${esc(st.name)}</button>`);
   if (i.open && !i.hold && i.waitingPqa && can.pqa) acts.push(`<button class="btn btn-ok" data-act="pqa-sign" data-b="${esc(b.Batch_No)}" data-s="${st.key}">${ico('pqa')}PQA sign ${esc(st.short)}</button>`);
   if (i.open && can.pqa) acts.push(`<button class="btn ${i.hold ? 'btn-ok' : 'btn-soft-bad'}" data-act="hold" data-b="${esc(b.Batch_No)}">${ico('hold')}${i.hold ? 'Release hold' : 'PQA hold'}</button>`);
-  if (i.done && !b.FG_TxnID && b.FG_Code && can.pqa) acts.push(`<button class="btn btn-primary" data-act="post-fg" data-b="${esc(b.Batch_No)}">${ico('box')}Post to FG stock</button>`);
   acts.push(`<button class="btn btn-ghost" data-act="pdf" data-b="${esc(b.Batch_No)}">${ico('pdf')}Batch card PDF</button>`);
   acts.push(`<button class="btn btn-ghost" data-act="qr" data-b="${esc(b.Batch_No)}" title="QR label">${ico('qr')}</button>`);
   if ((can.edit || (b.Created_By === S.D.me.username && i.step === 0)) && !i.void) acts.push(`<button class="btn btn-ghost" data-act="edit-batch" data-b="${esc(b.Batch_No)}" title="Edit batch">${ico('edit')}</button>`);
@@ -1470,10 +1508,14 @@ function renderBatch(r) {
       ${isNext && !i.hold && can.stages[s2.key] ? `<button class="btn btn-primary btn-sm" data-act="record" data-b="${esc(b.Batch_No)}" data-s="${s2.key}">${ico('plus')}Record</button>` : ''}</div>`;
   }).join('');
   const holdNote = i.hold ? `<div class="note bad" style="margin:0 20px 16px">${ico('hold')} On PQA hold since ${dt(b.Hold_At)} by ${esc(nameOf(b.Hold_By))}: ${esc(b.Hold_Reason)}</div>` : '';
-  const fgNote = b.FG_TxnID ? `<div class="note" style="margin:0 20px 16px;background:var(--ok-soft);color:var(--ok)">${ico('box')} In FG stock: ${fmtNum(b.FG_Qty)} of ${esc(b.FG_Code)} · ${esc(b.FG_TxnID)} · ${dt(b.FG_Posted_At)}</div>`
-    : i.done && !b.FG_Code ? `<div class="note warn" style="margin:0 20px 16px">No Stock Management FG code for ${esc(b.Part_Code)}. Set “Stock FG code” on the product under Dropdowns → Products to post it.</div>` : '';
+  // Stores receives a finished batch in Orders & Dispatch, which books it into FG stock.
+  const rc = receiptOf(b.Batch_No);
+  const fgNote = rc ? `<div class="note" style="margin:0 20px 16px;background:var(--ok-soft);color:var(--ok)">${ico('box')} In stores: ${fmtNum(rc.qty)} received ${dt(rc.at)} by ${esc(nameOf(rc.by))} · ${esc(rc.id)}${rc.orderNo ? ' · for ' + esc(rc.orderNo) : ''}</div>`
+    : b.FG_TxnID ? `<div class="note" style="margin:0 20px 16px;background:var(--ok-soft);color:var(--ok)">${ico('box')} In FG stock: ${fmtNum(b.FG_Qty)} of ${esc(b.FG_Code)} · ${esc(b.FG_TxnID)} · ${dt(b.FG_Posted_At)}</div>`
+    : i.done && !b.FG_Code ? `<div class="note warn" style="margin:0 20px 16px">No Stock Management FG code for ${esc(b.Part_Code)}. Set “Stock FG code” on the product under Dropdowns → Products, so Stores can receive it.</div>`
+    : i.done ? `<div class="note" style="margin:0 20px 16px">${ico('box')} Passed Final Audit — waiting for Stores to receive it in <a href="${OD_URL}#/receive" target="_blank" rel="noopener">Orders &amp; Dispatch</a>.</div>` : '';
   return `<div class="card"><div class="bhead"><div><div class="b-no">${esc(b.Batch_No)} ${statusBadge(b)}</div><div class="b-prod">${esc(b.Product_Name || b.Part_Code)}</div>
-      <div class="b-meta"><span>Part <b class="mono">${esc(b.Part_Code)}</b></span><span>Customer <b>${esc(b.Customer_Name || '—')}</b></span>${b.Rating ? `<span>Rating <b>${esc(b.Rating)}</b></span>` : ''}${b.Voltage ? `<span>Voltage <b>${esc(b.Voltage)}</b></span>` : ''}
+      <div class="b-meta"><span>Part <b class="mono">${esc(b.Part_Code)}</b></span><span>Customer <b>${esc(b.Customer_Name || '—')}</b></span>${b.Order_No ? `<span>Order <b class="mono">${esc(b.Order_No)}</b></span>` : ''}${b.Rating ? `<span>Rating <b>${esc(b.Rating)}</b></span>` : ''}${b.Voltage ? `<span>Voltage <b>${esc(b.Voltage)}</b></span>` : ''}
       <span>Started <b>${dt(b.Created_At)}</b> by ${esc(nameOf(b.Created_By))}</span></div>${b.Remarks ? `<div class="note">${esc(b.Remarks)}</div>` : ''}</div>
       <div class="bactions">${acts.join('')}</div></div>
     <div class="bstats"><div><small>Total</small><b>${fmtNum(b.Total_Qty)}</b></div><div><small>Good now</small><b style="color:var(--ok)">${fmtNum(b.Good_Qty)}</b></div><div><small>Rejected</small><b style="color:${num(b.Reject_Qty) ? 'var(--bad)' : 'inherit'}">${fmtNum(b.Reject_Qty || 0)}</b></div>
@@ -1574,7 +1616,7 @@ ACT.stab = (el) => { S.view.stageTab[el.dataset.k] = el.dataset.v; render(); };
    ========================================================================= */
 const APP_GALLERY = [
   ['Stock Management', 'RM, FG and Trade stock', 'https://calgas.github.io/Stock-Management/', '#b5652e', 'SM'],
-  ['Production Tracker', 'Handovers and work in progress', 'https://calgas.github.io/Production-Tracker/', '#3e6e97', 'PT'],
+  ['Orders & Dispatch', 'Orders, stores receipts and dispatches', 'https://calgas.github.io/Production-Tracker/', '#3e6e97', 'OD'],
   ['CALGAS Workforce', 'People and attendance', 'https://calgas.github.io/Workforce/', '#3f9e73', 'WF'],
   ['Calgas Tasks', 'Tasks and follow-ups', 'https://calgas.github.io/Tasks/', '#6b5fa8', 'TK'],
   ['calgascapacitors.com', 'Company website', 'https://calgascapacitors.com/', '#1c2024', 'CC']
@@ -1726,14 +1768,16 @@ function sigPadHtml(id, hint) {
 /* =========================================================================
    NEW / EDIT BATCH
    ========================================================================= */
-function openBatchForm(batch) {
+function openBatchForm(batch, pre) {
   const can = S.D.can, edit = !!batch;
+  pre = pre || {};
   const products = S.D.products.slice().sort((a, b) => String(a.Part_Code).localeCompare(String(b.Part_Code)));
   const customers = S.D.lists.Customers || [];
   const m = openModal(modalHead(edit ? 'Edit batch' : 'New batch', edit ? batch.Batch_No : 'Open a new batch card', edit ? '' : 'The batch number is given when you save.') +
     `<div class="modal-body"><div class="form-grid">
-      <div class="field full"><label>Part code <span class="req">*</span></label><input id="bfPart" list="bfParts" autocomplete="off" value="${esc(edit ? batch.Part_Code : '')}" placeholder="Type to search products">
+      <div class="field full"><label>Part code <span class="req">*</span></label><input id="bfPart" list="bfParts" autocomplete="off" value="${esc(edit ? batch.Part_Code : pre.part || '')}" placeholder="Type to search products">
         <datalist id="bfParts">${products.map(p => `<option value="${esc(p.Part_Code)}">${esc(p.Product_Name || '')}</option>`).join('')}</datalist><div class="hint" id="bfProd"></div></div>
+      <div class="field full"><label for="bfOrder">For order</label><select id="bfOrder"></select><div class="hint" id="bfOrderHint"></div></div>
       <div class="field"><label for="bfCust">Customer<span class="af hidden" id="bfCustTag"></span></label><select id="bfCust"><option value="">—</option>${customers.map(c => `<option ${edit && batch.Customer_Name === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></div>
       <div class="field"><label>Total quantity <span class="req">*</span></label><input id="bfQty" type="number" inputmode="numeric" min="1" step="1" value="${esc(edit ? batch.Total_Qty : '')}"><div class="hint" id="bfQtyHint"></div></div>
       ${can.backdate ? `<div class="field"><label>Batch date</label><input id="bfDate" type="datetime-local"><div class="hint">Leave empty for now. Only for paperwork entered late.</div></div>` : ''}
@@ -1758,12 +1802,39 @@ function openBatchForm(batch) {
       $('#bfCustTag', m.el).classList.toggle('hidden', !c);
     }
   };
-  $('#bfPart', m.el).addEventListener('input', showProd); showProd();
+  // Open order lines for this product (from Orders & Dispatch). Picking one
+  // fills the customer and what is still to be put into batches.
+  const lines = (S.D.orders && S.D.orders.lines) || [];
+  const fgOf = (p) => String(p.Stock_FG_Code || p.Part_Code || '').toUpperCase();
+  const inBatches = (id) => S.D.batches.filter(x => x.Order_Line === id && x.Status !== 'Void' && (!edit || x.Batch_No !== batch.Batch_No)).reduce((t, x) => t + num(x.Total_Qty), 0);
+  const fillOrders = () => {
+    const p = findProd(), sel = $('#bfOrder', m.el), cur = sel.value || (edit ? batch.Order_Line : pre.line) || '';
+    const mine = p ? lines.filter(l => [fgOf(p), String(p.Part_Code).toUpperCase()].indexOf(String(l.fgCode).toUpperCase()) > -1) : [];
+    let opts = '<option value="">— For stock (no order)</option>' + mine.map(l => `<option value="${esc(l.lineId)}">${esc(l.orderNo)} · ${esc(l.customer)} · ${fmtNum(l.qty)}${l.requiredBy ? ' by ' + dt(l.requiredBy).split(',')[0] : ''}${l.priority === 'Urgent' ? ' · URGENT' : ''}</option>`).join('');
+    if (cur && !mine.some(l => l.lineId === cur) && edit && batch.Order_Line === cur) opts += `<option value="${esc(cur)}">${esc(batch.Order_No)} (closed)</option>`;
+    sel.innerHTML = opts; sel.value = mine.some(l => l.lineId === cur) || (edit && batch.Order_Line === cur) ? cur : '';
+    sel.disabled = !mine.length && !sel.value;
+    $('#bfOrderHint', m.el).textContent = !S.D.orders || !S.D.orders.linked ? 'Orders & Dispatch can’t be reached just now.' : p && !mine.length ? 'No open orders for this product.' : '';
+  };
+  const pickOrder = (fill) => {
+    const l = lines.find(x => x.lineId === $('#bfOrder', m.el).value);
+    if (!l) return;
+    const done = inBatches(l.lineId), left = Math.max(0, l.qty - done);
+    $('#bfOrderHint', m.el).textContent = fmtNum(l.qty) + ' ordered · ' + fmtNum(done) + ' already in batches · ' + fmtNum(left) + ' to go.';
+    if (!fill) return;
+    const cs = $('#bfCust', m.el);
+    if (l.customer && ![...cs.options].some(o => o.value === l.customer)) cs.insertAdjacentHTML('beforeend', `<option>${esc(l.customer)}</option>`);
+    if (l.customer) { cs.value = l.customer; custAuto = false; $('#bfCustTag', m.el).textContent = 'Order'; $('#bfCustTag', m.el).classList.remove('hidden'); }
+    if (!$('#bfQty', m.el).value && left > 0) $('#bfQty', m.el).value = left;
+  };
+  $('#bfOrder', m.el).addEventListener('change', () => pickOrder(true));
+  $('#bfPart', m.el).addEventListener('input', () => { showProd(); fillOrders(); }); showProd(); fillOrders(); pickOrder(!edit && !!pre.line);
   setTimeout(() => $('#bfPart', m.el).focus(), 40);
   const txn = uuid();
   $('#bfSave', m.el).addEventListener('click', async (e) => {
     const err = $('#bfErr', m.el); err.textContent = '';
-    const p = { partCode: $('#bfPart', m.el).value.trim(), customer: $('#bfCust', m.el).value, totalQty: $('#bfQty', m.el).value, remarks: $('#bfRemarks', m.el).value };
+    const p = { partCode: $('#bfPart', m.el).value.trim(), customer: $('#bfCust', m.el).value, totalQty: $('#bfQty', m.el).value, remarks: $('#bfRemarks', m.el).value, orderLine: $('#bfOrder', m.el).value };
+    if (edit && (p.orderLine || '') === (batch.Order_Line || '')) delete p.orderLine;
     const prod = findProd();
     if (!prod) { err.textContent = p.partCode ? p.partCode + ' isn’t in Products. Pick a part code from the list, or add the product under Dropdowns → Products.' : 'Choose the part code.'; return; }
     p.partCode = prod.Part_Code;
@@ -1820,6 +1891,9 @@ function fieldInput(f, value, ctx) {
   if (f.type === 'int' || f.type === 'dec') {
     return `<div class="field">${lab}<div class="unit-wrap"><input id="${id}" data-key="${f.key}" class="${af}" type="number" inputmode="decimal" step="${f.type === 'int' ? '1' : 'any'}" min="0" value="${esc(v)}">${f.unit ? `<span class="unit">${esc(f.unit)}</span>` : ''}</div>${hint}</div>`;
   }
+  if (f.type === 'serial') {
+    return `<div class="field">${lab}<input id="${id}" data-key="${f.key}" class="${af} mono" value="${esc(v)}" maxlength="30" autocapitalize="characters" autocomplete="off" spellcheck="false" style="text-transform:uppercase" placeholder="${f.calc ? 'Worked out from the first' : 'e.g. K0001'}">${hint}</div>`;
+  }
   const dl = (ctx.options || []).length ? `<datalist id="${id}_l">${ctx.options.map(o => `<option value="${esc(o)}">`).join('')}</datalist>` : '';
   return `<div class="field">${lab}<input id="${id}" data-key="${f.key}" class="${af}" value="${esc(v)}" maxlength="200" ${dl ? `list="${id}_l" autocomplete="off"` : ''}>${dl}${hint}</div>`;
 }
@@ -1867,6 +1941,7 @@ async function openCardForm(batchNo, stageKey, editing) {
     if (f.from === 'product' && !blankV(product[f.key])) return { v: product[f.key], src: 'Product' };
     if (f.from === 'winding' && !blankV(win[f.key])) return { v: win[f.key], src: 'Winding' };
     if (f.fill === 'device' && mine.fields && !blankV(mine.fields[f.key])) return { v: mine.fields[f.key], src: 'Your last' };
+    if (f.fill === 'serial') return nextSerial(batchNo);
     if (f.fill) { const pv = pastValue(stageKey, batchNo, f.key, f.fill === 'setting'); if (pv) return { v: pv.v, src: 'As ' + pv.from }; }
     return { v: '' };
   };
@@ -1940,7 +2015,22 @@ async function openCardForm(batchNo, stageKey, editing) {
   };
   if (boxes) boxes.addEventListener('input', () => { boxes.dataset.touched = '1'; });
   if (caps) caps.addEventListener('input', calcBoxes);
-  const good = () => { $('#cfGood', el).textContent = fmtNum(goodNow()); if (st.rejects) $('#cfReasonWrap', el).classList.toggle('hidden', !(num($('#cfReject', el).value) > 0)); calcBoxes(); };
+  // Serial numbers: the last is the first + good − 1, unless typed; the count is checked against good.
+  const sFrom = $('#cf_Serial_From', el), sTo = $('#cf_Serial_To', el);
+  if (sTo && existing && !blankV(existing.Serial_To)) sTo.dataset.touched = '1';
+  const calcSerial = () => {
+    if (!sFrom || !sTo) return;
+    const g = goodNow(), from = sFrom.value.trim().toUpperCase();
+    if (!sTo.dataset.touched) sTo.value = from && parseSerial(from) && g > 0 ? serialAt(from, g - 1) : '';
+    const n = serialCount(from, sTo.value.trim().toUpperCase()), h = $('[data-hint="Serial_To"]', el);
+    if (h) {
+      h.textContent = !from ? '' : !n ? 'These don’t make a range (same letters, last after first).' : n === g ? fmtNum(n) + ' numbers — matches the good quantity.' : fmtNum(n) + ' numbers, but ' + fmtNum(g) + ' are good. Check.';
+      h.classList.toggle('warn', !!from && n !== g);
+    }
+  };
+  if (sTo) sTo.addEventListener('input', () => { sTo.dataset.touched = sTo.value ? '1' : ''; calcSerial(); });
+  if (sFrom) sFrom.addEventListener('input', calcSerial);
+  const good = () => { $('#cfGood', el).textContent = fmtNum(goodNow()); if (st.rejects) $('#cfReasonWrap', el).classList.toggle('hidden', !(num($('#cfReject', el).value) > 0)); calcBoxes(); calcSerial(); };
   ['#cfTotal', '#cfReject'].forEach(s => { const i = $(s, el); if (i) i.addEventListener('input', good); });
   good();
   wirePick(el);
@@ -2124,7 +2214,6 @@ function openPqaSign(batchNo, stageKey) {
       d._stage = stageKey; m.close(); applyResult(d); flushAlerts();
       const nb = d.batch;
       toast(st.name + ' signed off for ' + batchNo + (nb.Status === 'Done' ? ' — the batch is complete.' : '.'), 'ok');
-      if (nb.Status === 'Done' && !nb.FG_TxnID && nb.FG_Code && await confirmBox(batchNo + ' passed Final Audit. Post ' + fmtNum(nb.Good_Qty) + ' to FG stock (' + nb.FG_Code + ') now?', { title: 'Batch complete', eyebrow: 'FG stock', ok: 'Post to FG stock' })) postFg(batchNo);
     } catch (x) { err.textContent = x.message; } finally { done(); }
   });
   $('#pqBack', m.el).addEventListener('click', async () => { m.close(); await sendBack(batchNo, stageKey); });
