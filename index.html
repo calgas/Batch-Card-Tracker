@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="app-version" content="1.1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="app-version" content="1.2.0">
 <meta name="theme-color" content="#15181d">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -46,6 +46,9 @@
     --font: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
     --mono: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
     --app-zoom: 1;
+    /* The visible height: on phones and tablets 100vh is the height with the
+       browser bar hidden, which pushed the bottom bar off the screen. */
+    --vh: 100vh;
     --s1: #b5652e; --s2: #c98a3a; --s3: #b9a23c; --s4: #6f9a46; --s5: #3f9e73; --s6: #3e8c97; --s7: #3e6e97; --s8: #6b5fa8;
   }
   [data-theme="dark"] {
@@ -57,8 +60,14 @@
     --shadow: 0 4px 14px rgba(0, 0, 0, 0.35); --shadow-lift: 0 14px 30px -8px rgba(0, 0, 0, 0.6);
   }
   * { box-sizing: border-box; }
+  @supports (height: 100dvh) { :root { --vh: 100dvh; } }
   html { zoom: var(--app-zoom); }
   html, body { margin: 0; height: 100%; }
+  /* The page itself never scrolls or bounces (no browser pull-to-refresh):
+     only the content area scrolls, and the app does its own pull to refresh. */
+  html, body { overscroll-behavior: none; }
+  body:has(#appView:not(.hidden)) { overflow: hidden; }
+  button, a, .chip, [data-act], .nav-link, select, label { touch-action: manipulation; }
   body { font-family: var(--font); background: var(--paper); color: var(--ink); font-size: 14px; line-height: 1.45;
          -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; }
   button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; }
@@ -129,6 +138,7 @@
 
   /* ---------- splash / sign-in ---------- */
   .center { min-height: 100%; display: flex; align-items: center; justify-content: center; padding: 24px; }
+  #loginView { position: fixed; inset: 0; overflow-y: auto; overscroll-behavior: contain; }
   #splash { position: fixed; inset: 0; z-index: 100; background: var(--rail); color: var(--rail-ink); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; transition: opacity .35s var(--ease); }
   #splash.fade { opacity: 0; pointer-events: none; }
   .splash-logo { width: 68px; height: 68px; border-radius: 18px; background: linear-gradient(135deg, var(--copper), #e08a4d); display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 40px rgba(181,101,46,.45); }
@@ -148,13 +158,15 @@
   .login-foot { margin-top: 16px; font-size: 12.5px; color: var(--ink-soft); text-align: center; }
 
   /* ---------- app shell ---------- */
-  .shell { display: grid; grid-template-columns: 248px minmax(0, 1fr); height: calc(100vh / var(--app-zoom)); }
+  .shell { display: grid; grid-template-columns: 248px minmax(0, 1fr); position: fixed; top: 0; left: 0; right: 0; height: calc(var(--vh) / var(--app-zoom)); overflow: hidden; }
+  .shell.hidden { display: none !important; }
   .rail { background: var(--rail); color: var(--rail-ink); display: flex; flex-direction: column; min-height: 0; }
   .brand { display: flex; align-items: center; gap: 11px; padding: 20px 18px 16px; }
   .brand .splash-logo { width: 36px; height: 36px; border-radius: 10px; box-shadow: none; }
   .brand b { display: block; font-size: 14px; letter-spacing: .02em; } .brand small { display: block; font-size: 10px; color: var(--copper); letter-spacing: .16em; font-weight: 700; }
   .nav { flex: 1; overflow-y: auto; padding: 6px 10px; display: flex; flex-direction: column; gap: 2px; scrollbar-width: none; }
-  .nav-link { display: flex; align-items: center; gap: 11px; padding: 9px 11px; border-radius: 10px; color: var(--rail-soft); font-weight: 500; font-size: 13.5px; text-decoration: none; position: relative; width: 100%; text-align: left; }
+  .nav-link { display: flex; align-items: center; gap: 11px; padding: 9px 11px; border-radius: 10px; color: var(--rail-soft); font-weight: 500; font-size: 13.5px; text-decoration: none; position: relative; width: 100%; text-align: left;
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; transition: background .15s, color .15s; }
   @media (hover: hover) { .nav-link:hover { background: rgba(255,255,255,.05); color: var(--rail-ink); } }
   .nav-link.on { background: rgba(181,101,46,.16); color: #fff; }
   .nav-link.on::before { content: ''; position: absolute; left: -10px; top: 9px; bottom: 9px; width: 3px; border-radius: 0 3px 3px 0; background: var(--copper); }
@@ -187,9 +199,23 @@
   .zoom-ctl { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); height: 38px; }
   .zoom-ctl button { width: 32px; height: 36px; font-weight: 700; color: var(--ink-soft); } .zoom-ctl button:hover { color: var(--ink); }
   .zoom-ctl .zl { width: 46px; font-family: var(--mono); font-size: 11.5px; }
-  .content { flex: 1; overflow-y: auto; padding: 24px 26px 60px; scroll-behavior: smooth; }
-  .page { max-width: 1400px; margin: 0 auto; animation: pageIn .25s var(--ease); }
-  @keyframes pageIn { from { opacity: 0; transform: translateY(6px); } }
+  .content { flex: 1; overflow-y: auto; padding: 24px 26px 60px; overscroll-behavior-y: contain; -webkit-overflow-scrolling: touch; position: relative; }
+  .page { max-width: 1400px; margin: 0 auto; }
+  .page.enter { animation: pageIn .2s var(--ease); }
+  @keyframes pageIn { from { opacity: 0; transform: translateY(5px); } }
+  /* Pull to refresh (touch screens): refreshes the figures, not the page. */
+  .ptr { position: absolute; left: 50%; top: 0; z-index: 4; width: 40px; height: 40px; margin-left: -20px; border-radius: 50%; background: var(--panel); color: var(--copper);
+    box-shadow: 0 4px 14px rgba(0,0,0,.18); display: flex; align-items: center; justify-content: center; transform: translateY(-48px); opacity: 0; pointer-events: none; }
+  .ptr svg { width: 20px; height: 20px; }
+  .ptr.ready svg { transform: rotate(180deg); transition: transform .15s; }
+  .ptr.busy svg { animation: spin .8s linear infinite; }
+  .ptr.back { transition: transform .25s var(--ease), opacity .25s; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  /* Touch feedback */
+  @media (hover: none) {
+    .btn:active, .icon-btn:active, .chip:active, .bcard:active, a.kpi:active, .pipe:active { transform: scale(.97); transition: transform .08s; }
+    .nav-link:active { background: rgba(255,255,255,.08); }
+  }
   .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
   .page-head p { margin: 4px 0 0; color: var(--ink-soft); font-size: 13.5px; }
   .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 16px; }
@@ -269,7 +295,7 @@
   .tbl td { padding: 10px 14px; border-bottom: 1px solid var(--line-soft); white-space: nowrap; }
   .tbl tbody tr { cursor: pointer; } .tbl tbody tr:hover td { background: var(--hover); }
   .tbl .num { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--mono); font-size: 12.5px; }
-  .tbl-wrap { overflow: auto; max-height: calc(100vh / var(--app-zoom) - 240px); border-radius: var(--radius); }
+  .tbl-wrap { overflow: auto; max-height: calc(var(--vh) / var(--app-zoom) - 240px); border-radius: var(--radius); }
 
   /* ---------- batch page ---------- */
   .bhead { padding: 20px 22px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; }
@@ -328,7 +354,7 @@
   /* ---------- modals ---------- */
   .modal-bg { position: fixed; inset: 0; z-index: 60; background: rgba(12, 14, 18, .55); backdrop-filter: blur(3px); display: flex; align-items: center; justify-content: center; padding: 20px; animation: fadeIn .18s var(--ease); }
   @keyframes fadeIn { from { opacity: 0; } }
-  .modal { width: 100%; max-width: 560px; max-height: calc(100vh / var(--app-zoom) - 40px); display: flex; flex-direction: column; background: var(--panel); border-radius: 18px; box-shadow: var(--shadow-lift); animation: popIn .22s var(--spring); }
+  .modal { width: 100%; max-width: 560px; max-height: calc(var(--vh) / var(--app-zoom) - 40px); display: flex; flex-direction: column; background: var(--panel); border-radius: 18px; box-shadow: var(--shadow-lift); animation: popIn .22s var(--spring); }
   .modal.wide { max-width: 860px; }
   @keyframes popIn { from { opacity: 0; transform: translateY(12px) scale(.98); } }
   .modal-head { display: flex; align-items: flex-start; gap: 12px; padding: 18px 22px 14px; border-bottom: 1px solid var(--line-soft); }
@@ -360,7 +386,9 @@
   .sigpad.done { border-color: var(--ok); box-shadow: 0 0 0 3px var(--ok-soft); }
   .confirm-text { font-size: 14px; line-height: 1.55; }
   #lightbox { position: fixed; inset: 0; z-index: 80; background: rgba(8, 9, 12, .92); display: flex; align-items: center; justify-content: center; padding: 30px; }
-  #lightbox img { max-width: 100%; max-height: 100%; border-radius: 10px; box-shadow: 0 20px 60px rgba(0,0,0,.6); }
+  #lightbox { touch-action: none; overscroll-behavior: contain; }
+  #lightbox img { max-width: 100%; max-height: 100%; border-radius: 10px; box-shadow: 0 20px 60px rgba(0,0,0,.6); transform-origin: 0 0; will-change: transform; -webkit-user-drag: none; user-select: none; }
+  #lightbox img.anim { transition: transform .2s var(--ease); }
   #lightbox .lb-cap { position: absolute; bottom: 18px; left: 0; right: 0; text-align: center; color: #ddd; font-size: 13px; }
   #lightbox .icon-btn { position: absolute; top: 16px; right: 16px; color: #fff; background: rgba(255,255,255,.1); }
   #lightbox .lb-nav { position: absolute; top: 50%; transform: translateY(-50%); color: #fff; background: rgba(255,255,255,.1); width: 46px; height: 46px; border-radius: 12px; }
@@ -399,15 +427,42 @@
     .search { width: 170px; }
     #newBatchBtn { font-size: 0; gap: 0; padding-left: 11px; padding-right: 11px; }
   }
+  /* ---------- tablets (shop floor): a navigation rail with big targets ---------- */
+  @media (min-width: 781px) and (max-width: 1180px) {
+    .shell { grid-template-columns: 92px minmax(0, 1fr); }
+    .rail { align-items: stretch; }
+    .brand { justify-content: center; padding: 16px 8px 10px; } .brand > div:last-child { display: none; }
+    .nav { padding: 6px 8px; gap: 4px; }
+    .nav-sec, .nav-stage, .nav .desk { display: none !important; }
+    .nav-link.phone-only, .nav-link.tab-only { display: flex !important; }
+    .nav-link { flex-direction: column; justify-content: center; gap: 4px; min-height: 62px; padding: 8px 4px; font-size: 11px; font-weight: 600; text-align: center; border-radius: 14px; }
+    .nav-link .icon { width: 24px; height: 24px; }
+    .nav-link.on::before { left: -8px; top: 14px; bottom: 14px; }
+    .nav-link .count { position: absolute; top: 5px; right: 12px; margin: 0; padding: 0 5px; font-size: 10px; }
+    .rail-foot { flex-direction: column; padding: 10px 6px 14px; gap: 6px; } .rail-foot .who { display: none; }
+    .topbar { padding: 10px 18px; }
+    .content { padding: 18px 18px 40px; }
+    .icon-btn { min-width: 44px; min-height: 44px; }
+    .btn { min-height: 44px; }
+    .modal.wide { max-width: 760px; }
+    .board { scroll-snap-type: x proximity; } .board .col { scroll-snap-align: start; }
+  }
+  @media (min-width: 781px) and (max-width: 1000px) {
+    .g-3 { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (min-width: 781px) and (max-width: 1180px) and (max-height: 560px) {
+    .brand { display: none; } .nav-link { min-height: 52px; }
+  }
+  .tab-only { display: none !important; }
   @media (max-width: 780px) {
     .phone-only { display: revert !important; }
     .nav-link.phone-only { display: flex !important; }
     .desk-only { display: none !important; }
     .shell { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; }
-    .rail { order: 2; flex-direction: row; padding: 0 4px calc(4px + env(safe-area-inset-bottom)); border-top: 1px solid rgba(255,255,255,.06); }
+    .rail { order: 2; flex-direction: row; padding: 0 4px calc(4px + env(safe-area-inset-bottom)); border-top: 1px solid rgba(255,255,255,.06); position: relative; z-index: 6; }
     .brand, .rail-foot, .nav-sec, .nav-stage, .nav .desk { display: none !important; }
     .nav { flex-direction: row; justify-content: space-around; padding: 6px 0 2px; gap: 0; overflow: visible; }
-    .nav-link { flex-direction: column; gap: 3px; padding: 6px 4px; font-size: 10.5px; width: auto; flex: 1; align-items: center; text-align: center; }
+    .nav-link { flex-direction: column; gap: 3px; padding: 6px 4px; min-height: 54px; justify-content: center; font-size: 10.5px; width: auto; flex: 1; align-items: center; text-align: center; border-radius: 12px; }
     .nav-link.on::before { display: none; }
     .nav-link .count { position: absolute; top: 0; right: calc(50% - 22px); margin: 0; padding: 0 5px; font-size: 9.5px; }
     .nav-link .icon { width: 22px; height: 22px; }
@@ -429,10 +484,10 @@
     .scard-body { padding: 12px 14px 14px; }
     .readings { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .modal-bg { padding: 0; align-items: flex-end; }
-    .modal, .modal.wide { max-width: none; border-radius: 18px 18px 0 0; max-height: calc(100vh / var(--app-zoom) - 30px); }
+    .modal, .modal.wide { max-width: none; border-radius: 18px 18px 0 0; max-height: calc(var(--vh) / var(--app-zoom) - 12px); }
     .form-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
     .qty-row { gap: 8px; }
-    .board { grid-auto-columns: minmax(78vw, 1fr); }
+    .board { grid-auto-columns: minmax(78vw, 1fr); scroll-snap-type: x mandatory; } .board .col { scroll-snap-align: start; }
     .toolbar .seg { width: 100%; overflow-x: auto; } .toolbar .seg button { flex: 1; }
     #toasts { left: 12px; right: 12px; bottom: 84px; max-width: none; }
     .tbl-wrap { max-height: none; }
@@ -547,7 +602,7 @@
    behind the figures already on screen.
    ========================================================================= */
 
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.2.0';
 const BCT_API_URL = 'https://script.google.com/macros/s/AKfycbxdCU4dK92I_Q5mlzhp9cEw_efeX5bVfkfLfqbNf_5eDpyj1RljUh0WqO-Y5-t3RhNZ/exec';
 const STOCK_API_URL = 'https://script.google.com/macros/s/AKfycbzs_aW0G-NvVvs-_Yk41d4esq1lkKVBTzQEQTrbbIKe7kQfoYdXD3cuhd6Wt2UQ6MU0/exec';
 const APP_URL = 'https://calgas.github.io/Batch-Card-Tracker/';
@@ -893,13 +948,40 @@ function openModal(html, opts) {
   bg.className = 'modal-bg';
   bg.innerHTML = `<div class="modal ${opts.wide ? 'wide' : ''}" role="dialog" aria-modal="true">${html}</div>`;
   $('#modalRoot').appendChild(bg);
-  const close = () => { bg.remove(); if (opts.onClose) opts.onClose(); };
+  let closed = false;
+  const close = (byBack) => { if (closed) return; closed = true; bg.remove(); if (byBack !== true) layerClosed(); if (opts.onClose) opts.onClose(); };
   bg.addEventListener('mousedown', e => { if (e.target === bg && !opts.sticky) close(); });
   $$('[data-close]', bg).forEach(b => b.addEventListener('click', close));
   bg._close = close;
+  backCloses();
   return { el: bg, close };
 }
-function closeAllModals() { $$('.modal-bg').forEach(m => m.remove()); }
+/* ---------- the phone's Back button closes the open form or photo first ----------
+   Opening a form or a photo adds a history entry (same address) that records
+   how many are open. Back then closes the top one instead of leaving the page.
+   Entries left behind by closing with a button are stepped over, so Back
+   never seems to do nothing. */
+let lastHash = location.hash;
+function layers() { return $$('.modal-bg').concat($('#lightbox') ? [$('#lightbox')] : []); }
+function topLayer() { return layers().pop() || null; }
+function layerDepth() { return (history.state && history.state.bctLayer) || 0; }
+function backCloses() { try { history.pushState({ bctLayer: layers().length }, '', location.href); } catch (e) {} }
+function layerClosed() { if (layerDepth() > layers().length) S._deadBack = true; }
+window.addEventListener('popstate', () => {
+  const d = layerDepth();
+  if (layers().length > d) {
+    S._deadBack = false;
+    while (layers().length > d) { const l = topLayer(); if (l._close) l._close(true); else l.remove(); }
+    lastHash = location.hash;
+    return;
+  }
+  if (layers().length < d) { history.back(); return; }                 // an entry left by a closed form
+  if (S._deadBack && location.hash === lastHash) { S._deadBack = false; history.back(); return; }
+  S._deadBack = false;
+  lastHash = location.hash;
+});
+window.addEventListener('hashchange', () => { lastHash = location.hash; S._deadBack = false; });
+function closeAllModals() { $$('.modal-bg').forEach(m => m.remove()); layerClosed(); }
 function modalHead(eyebrow, title, sub) {
   return `<div class="modal-head"><div><div class="eyebrow">${esc(eyebrow)}</div><h3>${esc(title)}</h3>${sub ? `<p>${sub}</p>` : ''}</div>
     <button class="icon-btn" data-close aria-label="Close">${ico('x')}</button></div>`;
@@ -1007,10 +1089,16 @@ function render() {
                   dropdowns: renderDropdowns, more: renderMore, apps: renderApps, about: renderAbout, feedback: renderFeedback };
   const keepScroll = r.page === S._lastPage && r.batchNo === S._lastBatch;
   const top = c.scrollTop;
-  c.innerHTML = '<div class="page">' + (pages[r.page] || renderOverview)(r) + '</div>';
+  // Each page keeps its place: coming back to a list returns to where you were.
+  S.scrollMem = S.scrollMem || {};
+  if (!keepScroll && S._lastHash) S.scrollMem[S._lastHash] = top;
+  const hash = location.hash || '#/overview';
+  c.innerHTML = '<div class="page' + (keepScroll ? '' : ' enter') + '">' + (pages[r.page] || renderOverview)(r) + '</div>';
   hydrateProxyImages(c);
-  if (keepScroll) c.scrollTop = top; else c.scrollTop = 0;
+  if (keepScroll) c.scrollTop = top; else c.scrollTop = r.page === 'batch' && r.card ? 0 : (S.scrollMem[hash] || 0);
+  S._lastHash = hash;
   if (r.page === 'batch' && r.card && !keepScroll) { const el = document.getElementById('card-' + r.card); if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60); }
+  if (c._ptr) c.appendChild(c._ptr);
   S._lastPage = r.page; S._lastBatch = r.batchNo;
   if (afterRender[r.page]) afterRender[r.page](r);
 }
@@ -1100,9 +1188,15 @@ function wire() {
   document.addEventListener('click', e => { if (!e.target.closest('#searchBox')) $('#searchPop').classList.add('hidden'); });
   document.addEventListener('keydown', e => {
     if (e.key === '/' && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) { e.preventDefault(); si.focus(); }
-    if (e.key === 'Escape') { const m = $$('.modal-bg').pop(); if (m && m._close) m._close(); const lb = $('#lightbox'); if (lb) lb.remove(); }
+    if (e.key === 'Escape') { const l = topLayer(); if (l) { if (l._close) l._close(); else l.remove(); } }
   });
   window.addEventListener('hashchange', render);
+  // Tapping the tab you are on goes back to the top of it.
+  $('#nav').addEventListener('click', e => {
+    const a = e.target.closest('a.nav-link');
+    if (a && a.getAttribute('href') === (location.hash || '#/overview')) { e.preventDefault(); $('#content').scrollTo({ top: 0, behavior: 'smooth' }); }
+  });
+  pullToRefresh($('#content'));
   window.addEventListener('online', syncIdle); window.addEventListener('offline', syncIdle);
   setInterval(() => { if (S.session && S.D && document.visibilityState === 'visible' && !S.inflight && !$('.modal-bg') && Date.now() - S.lastSync > 120000) refresh(true); }, 30000);
   setInterval(() => { if (!S.inflight) syncIdle(); }, 30000);
@@ -1110,6 +1204,35 @@ function wire() {
 }
 
 const ACT = {};
+
+/* ---------- pull to refresh (touch screens) ----------
+   The browser's own pull-to-refresh reloads the whole page and is switched
+   off. Pulling down at the top of a page fetches the latest figures. */
+function pullToRefresh(c) {
+  if (!('ontouchstart' in window)) return;
+  const ind = document.createElement('div');
+  ind.className = 'ptr';
+  ind.innerHTML = ico('refresh');
+  c._ptr = ind; c.appendChild(ind);
+  let y0 = null, dy = 0, busy = false;
+  const set = (d, cls) => { ind.className = 'ptr ' + (cls || ''); ind.style.transform = 'translateY(' + (Math.min(d, 90) - 48) + 'px)'; ind.style.opacity = Math.min(1, d / 60); };
+  c.addEventListener('touchstart', e => { if (busy || c.scrollTop > 0 || e.touches.length > 1 || topLayer()) { y0 = null; return; } y0 = e.touches[0].clientY; dy = 0; }, { passive: true });
+  c.addEventListener('touchmove', e => {
+    if (y0 === null) return;
+    dy = (e.touches[0].clientY - y0) * 0.5;
+    if (dy <= 0 || c.scrollTop > 0) { y0 = dy <= 0 && c.scrollTop > 0 ? null : y0; set(0); return; }
+    set(dy, dy > 60 ? 'ready' : '');
+  }, { passive: true });
+  c.addEventListener('touchend', async () => {
+    if (y0 === null) return;
+    y0 = null;
+    if (dy > 60 && !busy) {
+      busy = true; set(70, 'busy');
+      try { await refresh(true); toast('Up to date', 'ok'); } finally { busy = false; }
+    }
+    ind.className = 'ptr back'; ind.style.transform = 'translateY(-48px)'; ind.style.opacity = 0;
+  });
+}
 
 
 /* =========================================================================
@@ -2075,15 +2198,80 @@ ACT.qr = (el) => {
     w.document.close();
   });
 };
+// Photos full screen: swipe left/right for the next one, pinch or double-tap
+// to zoom and drag to look around, swipe down or Back to close.
 ACT.lightbox = (el) => {
   const all = $$('[data-act=lightbox]');
   let k = all.indexOf(el);
   const lb = document.createElement('div');
   lb.id = 'lightbox';
-  const show = () => { const t = all[k]; lb.innerHTML = `<img src="${esc(mediaSrc(t.dataset.mid, 1800) || ($('img', t) || {}).src || '')}" data-mid="${esc(t.dataset.mid)}" data-w="1800" alt=""><div class="lb-cap">${esc(t.dataset.cap || '')} · ${k + 1} / ${all.length}</div>
-      <button class="icon-btn" data-lb="x">${ico('x')}</button>${all.length > 1 ? `<button class="lb-nav lb-prev" data-lb="-1">‹</button><button class="lb-nav lb-next" data-lb="1">›</button>` : ''}`; hydrateProxyImages(lb); };
-  lb.addEventListener('click', e => { const t = e.target.closest('[data-lb]'); if (!t) { if (e.target === lb) lb.remove(); return; } if (t.dataset.lb === 'x') lb.remove(); else { k = (k + Number(t.dataset.lb) + all.length) % all.length; show(); } });
+  let im = null, s = 1, tx = 0, ty = 0;
+  const apply = (anim) => { if (!im) return; im.classList.toggle('anim', !!anim); im.style.transform = `translate(${tx}px, ${ty}px) scale(${s})`; };
+  const reset = (anim) => { s = 1; tx = 0; ty = 0; apply(anim); };
+  const close = (byBack) => { lb.remove(); if (byBack !== true) layerClosed(); };
+  lb._close = close;
+  const show = () => {
+    const t = all[k];
+    lb.innerHTML = `<img src="${esc(mediaSrc(t.dataset.mid, 1800) || ($('img', t) || {}).src || '')}" data-mid="${esc(t.dataset.mid)}" data-w="1800" alt="" draggable="false"><div class="lb-cap">${esc(t.dataset.cap || '')} · ${k + 1} / ${all.length}</div>
+      <button class="icon-btn" data-lb="x" aria-label="Close">${ico('x')}</button>${all.length > 1 ? `<button class="lb-nav lb-prev" data-lb="-1" aria-label="Previous photo">‹</button><button class="lb-nav lb-next" data-lb="1" aria-label="Next photo">›</button>` : ''}`;
+    hydrateProxyImages(lb);
+    im = $('img', lb); reset();
+    // The neighbours are fetched now so the next swipe shows at once.
+    [-1, 1].forEach(d => { const n = all[(k + d + all.length) % all.length]; const u = n && mediaSrc(n.dataset.mid, 1800); if (u) { const p = new Image(); p.src = u; } });
+  };
+  const step = (d) => { if (all.length > 1) { k = (k + d + all.length) % all.length; show(); } };
+  lb.addEventListener('click', e => { const t = e.target.closest('[data-lb]'); if (!t) { if (e.target === lb && s === 1) history.back(); return; } if (t.dataset.lb === 'x') history.back(); else step(Number(t.dataset.lb)); });
+  // Touch: one finger swipes (or drags a zoomed photo), two fingers pinch.
+  const pts = new Map();
+  let start = null, lastTap = 0;
+  lb.addEventListener('pointerdown', e => {
+    if (e.target.closest('[data-lb]')) return;
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const r = im ? im.getBoundingClientRect() : null;
+    if (pts.size === 1) {
+      const now = Date.now();
+      if (now - lastTap < 280 && im && e.target === im) {   // double tap: zoom in where tapped, or back out
+        if (s > 1) reset(true); else { const ox = e.clientX - r.left, oy = e.clientY - r.top; s = 2.5; tx = -ox * (s - 1); ty = -oy * (s - 1); apply(true); }
+        lastTap = 0; start = null; return;
+      }
+      lastTap = now;
+      start = { x: e.clientX, y: e.clientY, tx, ty, s };
+    } else if (pts.size === 2) {
+      const [a, b] = [...pts.values()];
+      start = { d: Math.hypot(a.x - b.x, a.y - b.y), s, tx, ty, cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2, r };
+    }
+  });
+  lb.addEventListener('pointermove', e => {
+    if (!pts.has(e.pointerId) || !start) return;
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pts.size === 2 && start.d) {
+      const [a, b] = [...pts.values()];
+      const ns = Math.max(1, Math.min(4, start.s * Math.hypot(a.x - b.x, a.y - b.y) / start.d));
+      const k2 = ns / start.s, ox = start.cx - start.r.left + start.tx * 0, oy = start.cy - start.r.top;
+      s = ns; tx = start.tx - ox * (k2 - 1) * 1; ty = start.ty - oy * (k2 - 1);
+      apply();
+    } else if (pts.size === 1 && start.x !== undefined) {
+      const dx = e.clientX - start.x, dy = e.clientY - start.y;
+      if (s > 1) { tx = start.tx + dx; ty = start.ty + dy; apply(); }
+      else { tx = dx; ty = Math.max(0, dy); apply(); if (im) im.style.opacity = String(1 - Math.min(0.6, ty / 400)); }
+    }
+  });
+  const end = e => {
+    if (!pts.has(e.pointerId)) return;
+    pts.delete(e.pointerId);
+    if (!start || pts.size) { if (pts.size === 1) { const [p] = [...pts.values()]; start = { x: p.x, y: p.y, tx, ty, s }; } return; }
+    const dx = e.clientX - (start.x || 0), dy = e.clientY - (start.y || 0);
+    if (s <= 1.02 && start.x !== undefined) {
+      if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy)) step(dx < 0 ? 1 : -1);
+      else if (dy > 100) history.back();
+      else { reset(true); if (im) im.style.opacity = ''; }
+    }
+    if (s <= 1.02 && start.d) reset(true);
+    start = null;
+  };
+  lb.addEventListener('pointerup', end); lb.addEventListener('pointercancel', end);
   show(); document.body.appendChild(lb);
+  backCloses();
 };
 async function openScan() {
   const hasDetector = 'BarcodeDetector' in window && navigator.mediaDevices;
