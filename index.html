@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="app-version" content="1.0.0">
+<meta name="app-version" content="1.0.1">
 <meta name="theme-color" content="#15181d">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -534,7 +534,7 @@
    behind the figures already on screen.
    ========================================================================= */
 
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.0.1';
 const BCT_API_URL = 'https://script.google.com/macros/s/AKfycbxdCU4dK92I_Q5mlzhp9cEw_efeX5bVfkfLfqbNf_5eDpyj1RljUh0WqO-Y5-t3RhNZ/exec';
 const STOCK_API_URL = 'https://script.google.com/macros/s/AKfycbzs_aW0G-NvVvs-_Yk41d4esq1lkKVBTzQEQTrbbIKe7kQfoYdXD3cuhd6Wt2UQ6MU0/exec';
 const APP_URL = 'https://calgas.github.io/Batch-Card-Tracker/';
@@ -758,36 +758,43 @@ function openBatches() { return S.D.batches.filter(b => info(b).open); }
 
 /* ---------- media ---------- */
 function mediaMode() { return (S.D && S.D.settings && S.D.settings.mediaMode) || 'public'; }
+// Width 0 means the original file. Signatures are small transparent PNGs,
+// and a resized copy from Google's image server comes back with a black
+// background (black strokes on black), so they are always shown as is.
+const SIG_W = 0;
 function mediaSrc(id, w) {
   if (!id || String(id).indexOf('missing:') === 0) return '';
   if (S.localMedia[id]) return S.localMedia[id];
   if (mediaMode() === 'proxy') return '';
-  return 'https://lh3.googleusercontent.com/d/' + encodeURIComponent(id) + '=w' + (w || 400);
+  return 'https://lh3.googleusercontent.com/d/' + encodeURIComponent(id) + (w === 0 ? '' : '=w' + (w || 400));
 }
 function img(id, w, cls, alt) {
   if (!id || String(id).indexOf('missing:') === 0) return '';
-  const src = mediaSrc(id, w);
-  return `<img class="${cls || ''}" data-mid="${esc(id)}" data-w="${w || 400}" ${src ? `src="${esc(src)}"` : ''} loading="lazy" decoding="async" alt="${esc(alt || '')}">`;
+  const ww = w === 0 ? 0 : (w || 400);
+  const src = mediaSrc(id, ww);
+  return `<img class="${cls || ''}" data-mid="${esc(id)}" data-w="${ww}" ${src ? `src="${esc(src)}"` : ''} loading="lazy" decoding="async" alt="${esc(alt || '')}">`;
 }
 // lh3 → Drive's thumbnail service → this app's own script (and its cache).
+// Originals (signatures) skip the thumbnail service, which also flattens them.
 document.addEventListener('error', function (e) {
   const im = e.target;
   if (!im || im.tagName !== 'IMG' || !im.dataset.mid) return;
-  const id = im.dataset.mid, w = im.dataset.w || 400, tried = Number(im.dataset.tried || 0);
+  const id = im.dataset.mid, w = Number(im.dataset.w || 400), tried = Number(im.dataset.tried || 0);
   im.dataset.tried = tried + 1;
-  if (tried === 0 && mediaMode() !== 'proxy') im.src = 'https://drive.google.com/thumbnail?id=' + encodeURIComponent(id) + '&sz=w' + w;
+  if (tried === 0 && w && mediaMode() !== 'proxy') im.src = 'https://drive.google.com/thumbnail?id=' + encodeURIComponent(id) + '&sz=w' + w;
   else if (tried <= 1) proxyMedia(id, w).then(u => { if (u) im.src = u; }).catch(() => {});
 }, true);
 const proxyCache = {};
 async function proxyMedia(id, w) {
-  const key = id + ':' + (w > 400 ? 'full' : 'thumb');
+  w = Number(w);
+  const key = id + ':' + (w === 0 || w > 400 ? 'full' : 'thumb');
   if (proxyCache[key]) return proxyCache[key];
   const cacheUrl = 'https://bct.local/media/' + key;
   try {
     const c = await caches.open('bct-media-v1');
     const hit = await c.match(cacheUrl);
     if (hit) return (proxyCache[key] = URL.createObjectURL(await hit.blob()));
-    const d = await api('getMedia', { id, size: w > 400 ? 0 : 400 });
+    const d = await api('getMedia', { id, size: w === 0 || w > 400 ? 0 : 400 });
     const bytes = Uint8Array.from(atob(d.data), ch => ch.charCodeAt(0));
     const blob = new Blob([bytes], { type: d.mime });
     c.put(cacheUrl, new Response(blob)).catch(() => {});
@@ -1218,7 +1225,7 @@ function stageCardHtml(b, st, i, c) {
     ? `<div class="photo" data-act="lightbox" data-mid="${esc(c[p.key])}" data-cap="${esc(b.Batch_No + ' · ' + st.name + ' · ' + p.label)}">${img(c[p.key], 520, '', p.label)}<span>${esc(p.label)}</span></div>`
     : `<div class="photo none">${c[p.key] ? 'Photo not found in the old app' : 'No ' + esc(p.label.toLowerCase())}</div>`).join('');
   const sigBox = (id, label, who, at) => id && String(id).indexOf('missing:') !== 0
-    ? `<div class="sig">${img(id, 360, '', label)}<small><b>${esc(label)}</b><br>${esc(nameOf(who) || '')}${at ? ' · ' + dt(at) : ''}</small></div>`
+    ? `<div class="sig">${img(id, SIG_W, '', label)}<small><b>${esc(label)}</b><br>${esc(nameOf(who) || '')}${at ? ' · ' + dt(at) : ''}</small></div>`
     : `<div class="sig wait">${esc(label)}<br>${label === 'PQA' ? 'waiting' : 'not signed'}</div>`;
   let legacy = '';
   if (c.Legacy) { try { const l = JSON.parse(c.Legacy); legacy = `<div class="note">From the AppSheet app: ${esc(l.from || '')}${l.tp && l.tp.PQA_By ? ' · Testing & Packing first signed by ' + esc(nameOf(l.tp.PQA_By)) : ''}.</div>`; } catch (e) {} }
@@ -1750,7 +1757,7 @@ function openPqaSign(batchNo, stageKey) {
   const photos = st.photos.filter(p => c[p.key] && String(c[p.key]).indexOf('missing:') !== 0).map(p => `<div class="photo" data-act="lightbox" data-mid="${esc(c[p.key])}" data-cap="${esc(p.label)}">${img(c[p.key], 520)}<span>${esc(p.label)}</span></div>`).join('');
   const m = openModal(modalHead('PQA sign-off · Stage ' + st.no, st.name + ' — ' + batchNo, esc(b.Product_Name || b.Part_Code) + ' · recorded by ' + esc(nameOf(c.Recorded_By)) + ' ' + ago(c.Recorded_At)) +
     `<div class="modal-body">${readings}${c.Remarks ? `<div class="note">${esc(c.Remarks)}</div>` : ''}
-      ${photos || c.Sup_Signature ? `<div class="photos" style="grid-template-columns:repeat(${Math.min(3, st.photos.length + 1)},1fr)">${photos}${c.Sup_Signature ? `<div class="sig" style="aspect-ratio:auto">${img(c.Sup_Signature, 360)}<small>Supervisor${c.Sup_Signed_By ? ' · ' + esc(c.Sup_Signed_By) : ''}</small></div>` : ''}</div>` : ''}
+      ${photos || c.Sup_Signature ? `<div class="photos" style="grid-template-columns:repeat(${Math.min(3, st.photos.length + 1)},1fr)">${photos}${c.Sup_Signature ? `<div class="sig" style="aspect-ratio:auto">${img(c.Sup_Signature, SIG_W)}<small>Supervisor${c.Sup_Signed_By ? ' · ' + esc(c.Sup_Signed_By) : ''}</small></div>` : ''}</div>` : ''}
       <div class="fsec">Your sign-off</div>${sigPadHtml('pqSig', 'PQA signs here')}
       <div class="field"><label>PQA remarks</label><input id="pqRemarks" maxlength="500" placeholder="Optional"></div><div class="form-error" id="pqErr"></div></div>
     <div class="modal-foot"><button class="btn btn-soft-bad" id="pqBack">${ico('undo')}Send back</button><button class="btn btn-ghost" id="pqHold">${ico('hold')}Hold batch</button><span class="grow"></span>
