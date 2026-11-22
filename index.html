@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="app-version" content="1.0.2">
+<meta name="app-version" content="1.1.0">
 <meta name="theme-color" content="#15181d">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -105,6 +105,13 @@
   .field .unit { position: absolute; right: 11px; top: 50%; transform: translateY(-50%); font-size: 12px; color: var(--ink-faint); font-weight: 600; pointer-events: none; }
   .field .auto { min-height: 42px; padding: 10px 12px; border-radius: 10px; background: var(--line-soft); color: var(--ink-soft); font-weight: 600; font-family: var(--mono); font-size: 13px; }
   .hint { font-size: 12px; color: var(--ink-faint); }
+  .field .hint:not(:empty) { margin-top: 4px; }
+  .hint.warn { color: #a07617; font-weight: 600; background: var(--warn-soft); padding: 5px 8px; border-radius: 7px; }
+  .linkish { color: var(--copper); font-weight: 700; text-decoration: underline; padding: 0 2px; font-size: inherit; }
+  .af { margin-left: 7px; padding: 1px 7px; border-radius: 99px; background: var(--azure-soft); color: var(--azure); font-size: 10.5px; font-weight: 700; letter-spacing: 0; text-transform: none; vertical-align: 1px; white-space: nowrap; }
+  .field .af-on, .chips.af-on .chip.on { border-color: color-mix(in srgb, var(--azure) 55%, var(--line)); }
+  .now-wrap { display: flex; gap: 6px; } .now-wrap input { flex: 1; min-width: 0; }
+  .check-list { margin: 10px 0 0; padding-left: 18px; display: grid; gap: 6px; font-size: 13.5px; color: var(--ink-soft); }
   .form-error { color: var(--bad); font-size: 13px; font-weight: 600; min-height: 0; }
   .form-error:not(:empty) { padding: 9px 12px; background: var(--bad-soft); border-radius: 9px; }
   .seg { display: inline-flex; gap: 2px; padding: 3px; background: var(--panel); border: 1px solid var(--line); border-radius: 11px; }
@@ -540,7 +547,7 @@
    behind the figures already on screen.
    ========================================================================= */
 
-const APP_VERSION = '1.0.2';
+const APP_VERSION = '1.1.0';
 const BCT_API_URL = 'https://script.google.com/macros/s/AKfycbxdCU4dK92I_Q5mlzhp9cEw_efeX5bVfkfLfqbNf_5eDpyj1RljUh0WqO-Y5-t3RhNZ/exec';
 const STOCK_API_URL = 'https://script.google.com/macros/s/AKfycbzs_aW0G-NvVvs-_Yk41d4esq1lkKVBTzQEQTrbbIKe7kQfoYdXD3cuhd6Wt2UQ6MU0/exec';
 const APP_URL = 'https://calgas.github.io/Batch-Card-Tracker/';
@@ -728,6 +735,69 @@ async function refresh(quiet) {
 function stages() { return S.D ? S.D.stages : []; }
 function stageByKey(k) { return stages().find(s => s.key === k); }
 function cardOf(batchNo, key) { return (S.cardsBy[batchNo] || {})[key] || null; }
+
+/* ---------- autofill: earlier batches and this person's last entry ----------
+   Every value the app can work out is filled in, so less is typed and fewer
+   slips get in. Readings are checked against earlier batches of the same
+   product, and anything far off is pointed out before saving. */
+function lastKey(stageKey) { return 'bct_last:' + (S.session ? S.session.username : '') + ':' + stageKey; }
+function partOf(batchNo) { return String((S.batchBy[batchNo] || {}).Part_Code || '').trim().toUpperCase(); }
+function voltOf(batchNo) { return String((S.batchBy[batchNo] || {}).Voltage || '').trim().toUpperCase(); }
+function cardTime(c) { const t = new Date(c.Recorded_At).getTime(); return isNaN(t) ? 0 : t; }
+function blankV(v) { return v === '' || v === null || v === undefined; }
+// Cards of a stage on other batches, newest first: the same part code, then
+// (wide) the same voltage, then any batch.
+function pastCards(stageKey, batchNo, wide) {
+  const pc = partOf(batchNo), volt = voltOf(batchNo);
+  const all = (S.D.cards[stageKey] || []).filter(c => c.Batch_No !== batchNo).sort((x, y) => cardTime(y) - cardTime(x));
+  const same = all.filter(c => partOf(c.Batch_No) === pc);
+  if (!wide) return same;
+  const sameV = volt ? all.filter(c => partOf(c.Batch_No) !== pc && voltOf(c.Batch_No) === volt) : [];
+  return same.concat(sameV, all.filter(c => partOf(c.Batch_No) !== pc && (!volt || voltOf(c.Batch_No) !== volt)));
+}
+function pastValue(stageKey, batchNo, key, wide) {
+  const c = pastCards(stageKey, batchNo, wide).find(x => !blankV(x[key]));
+  return c ? { v: c[key], from: c.Batch_No } : null;
+}
+// Up to 12 earlier readings to compare with: the same part code, else the same voltage.
+function pastNumbers(stageKey, batchNo, key) {
+  const nums = list => list.map(c => c[key]).filter(v => !blankV(v) && !isNaN(Number(v))).map(Number).slice(0, 12);
+  let n = nums(pastCards(stageKey, batchNo, false));
+  if (n.length < 2) {
+    const volt = voltOf(batchNo);
+    n = volt ? nums((S.D.cards[stageKey] || []).filter(c => c.Batch_No !== batchNo && voltOf(c.Batch_No) === volt).sort((x, y) => cardTime(y) - cardTime(x))) : [];
+  }
+  return n.length >= 2 ? n : [];
+}
+function distinctPast(stageKeys, key, limit) {
+  const seen = {}, out = [];
+  stageKeys.forEach(k => (S.D.cards[k] || []).slice().sort((x, y) => cardTime(y) - cardTime(x)).forEach(c => {
+    const v = String(c[key] || '').trim(); const u = v.toUpperCase();
+    if (v && !seen[u]) { seen[u] = 1; out.push(v); }
+  }));
+  return out.slice(0, limit || 40);
+}
+// How long this stage usually takes between time in and time out.
+function durationHint(stageKey, batchNo) {
+  const hrs = pastCards(stageKey, batchNo, true).map(c => (new Date(c.Time_Out) - new Date(c.Time_In)) / 3600000).filter(h => h > 0 && h < 24 * 7).slice(0, 12).sort((a, b) => a - b);
+  if (hrs.length < 2) return '';
+  const h = hrs[Math.floor(hrs.length / 2)];
+  return 'Usually about ' + (h >= 10 ? Math.round(h) : Math.round(h * 10) / 10) + ' h from time in to time out.';
+}
+// A reading well outside earlier batches is most likely a slip of the finger.
+// Returns null when it looks fine, else { msg, fix } (fix: the likely meant value).
+function readingCheck(value, past) {
+  if (blankV(value) || isNaN(Number(value)) || !past.length) return null;
+  const n = Number(value), lo = Math.min.apply(null, past), hi = Math.max.apply(null, past);
+  const mid = past.slice().sort((a, b) => a - b)[Math.floor(past.length / 2)];
+  const pad = Math.max(hi - lo, Math.abs(mid) * 0.25) * 0.6;
+  const ok = v => v >= lo - pad && v <= hi + pad;
+  if (ok(n)) return null;
+  let fix = null;
+  [10, 100, 1000, 0.1, 0.01, 0.001].some(k => { const t = +(n * k).toPrecision(6); if (ok(t)) { fix = t; return true; } return false; });
+  const range = lo === hi ? fmtNum(lo) : fmtNum(lo) + '–' + fmtNum(hi);
+  return { msg: 'Earlier batches: ' + range + (fix !== null ? '. Did you mean ' + fmtNum(fix) + '?' : ''), fix };
+}
 function signed(c) { return !!(c && (c.PQA_Signature || c.PQA_At)); }
 
 // Where a batch stands: step 0–16, the stage it is at, what's next.
@@ -839,8 +909,8 @@ function confirmBox(message, opts) {
   return new Promise(resolve => {
     let answered = false;
     const m = openModal(modalHead(opts.eyebrow || 'Please confirm', opts.title || 'Are you sure?') +
-      `<div class="modal-body"><div class="confirm-text">${esc(message)}</div></div>
-       <div class="modal-foot"><button class="btn btn-ghost" data-close>Cancel</button>
+      `<div class="modal-body"><div class="confirm-text">${esc(message)}</div>${opts.list ? `<ul class="check-list">${opts.list.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}</div>
+       <div class="modal-foot"><button class="btn btn-ghost" data-close>${esc(opts.cancel || 'Cancel')}</button>
        <button class="btn ${opts.danger ? 'btn-bad' : 'btn-primary'}" data-ok>${esc(opts.ok || 'OK')}</button></div>`,
       { onClose: () => { if (!answered) resolve(false); } });
     $('[data-ok]', m.el).addEventListener('click', () => { answered = true; m.close(); resolve(true); });
@@ -1541,20 +1611,40 @@ function openBatchForm(batch) {
     `<div class="modal-body"><div class="form-grid">
       <div class="field full"><label>Part code <span class="req">*</span></label><input id="bfPart" list="bfParts" autocomplete="off" value="${esc(edit ? batch.Part_Code : '')}" placeholder="Type to search products">
         <datalist id="bfParts">${products.map(p => `<option value="${esc(p.Part_Code)}">${esc(p.Product_Name || '')}</option>`).join('')}</datalist><div class="hint" id="bfProd"></div></div>
-      <div class="field"><label>Customer</label><select id="bfCust"><option value="">—</option>${customers.map(c => `<option ${edit && batch.Customer_Name === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></div>
-      <div class="field"><label>Total quantity <span class="req">*</span></label><input id="bfQty" type="number" inputmode="numeric" min="1" step="1" value="${esc(edit ? batch.Total_Qty : '')}"></div>
+      <div class="field"><label for="bfCust">Customer<span class="af hidden" id="bfCustTag"></span></label><select id="bfCust"><option value="">—</option>${customers.map(c => `<option ${edit && batch.Customer_Name === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></div>
+      <div class="field"><label>Total quantity <span class="req">*</span></label><input id="bfQty" type="number" inputmode="numeric" min="1" step="1" value="${esc(edit ? batch.Total_Qty : '')}"><div class="hint" id="bfQtyHint"></div></div>
       ${can.backdate ? `<div class="field"><label>Batch date</label><input id="bfDate" type="datetime-local"><div class="hint">Leave empty for now. Only for paperwork entered late.</div></div>` : ''}
       <div class="field full"><label>Remarks</label><textarea id="bfRemarks" maxlength="1000">${esc(edit ? batch.Remarks : '')}</textarea></div>
       ${edit && num(batch.Step) > 0 ? '<div class="field full"><label>Why the change <span class="req">*</span></label><input id="bfReason" maxlength="300"></div>' : ''}
     </div><div class="form-error" id="bfErr"></div></div>
     <div class="modal-foot"><button class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-primary" id="bfSave">${edit ? 'Save changes' : 'Create batch'}</button></div>`);
-  const showProd = () => { const p = products.find(x => String(x.Part_Code).toUpperCase() === $('#bfPart', m.el).value.trim().toUpperCase()); $('#bfProd', m.el).textContent = p ? [p.Product_Name, p.Rating, p.Voltage].filter(Boolean).join(' · ') : ($('#bfPart', m.el).value ? 'Not in Products yet.' : ''); };
+  const findProd = () => products.find(x => String(x.Part_Code).toUpperCase() === $('#bfPart', m.el).value.trim().toUpperCase());
+  let custAuto = !edit;
+  $('#bfCust', m.el).addEventListener('change', () => { custAuto = false; $('#bfCustTag', m.el).classList.add('hidden'); });
+  const showProd = () => {
+    const p = findProd(), typed = $('#bfPart', m.el).value.trim();
+    $('#bfProd', m.el).textContent = p ? [p.Product_Name, p.Rating, p.Voltage].filter(Boolean).join(' · ') : (typed ? 'Not in Products: pick a part code from the list.' : '');
+    $('#bfProd', m.el).classList.toggle('warn', !p && !!typed);
+    // The last batch of this product: its customer is filled in, its quantity shown.
+    const last = p ? S.D.batches.filter(x => String(x.Part_Code).toUpperCase() === String(p.Part_Code).toUpperCase() && x.Status !== 'Void').sort((a, b) => new Date(b.Created_At) - new Date(a.Created_At))[0] : null;
+    $('#bfQtyHint', m.el).textContent = last ? 'Last batch of this product: ' + fmtNum(last.Total_Qty) + ' (' + last.Batch_No + ')' : '';
+    if (custAuto) {
+      const c = last && customers.indexOf(last.Customer_Name) > -1 ? last.Customer_Name : '';
+      $('#bfCust', m.el).value = c;
+      $('#bfCustTag', m.el).textContent = c ? 'As ' + last.Batch_No : '';
+      $('#bfCustTag', m.el).classList.toggle('hidden', !c);
+    }
+  };
   $('#bfPart', m.el).addEventListener('input', showProd); showProd();
   setTimeout(() => $('#bfPart', m.el).focus(), 40);
   const txn = uuid();
   $('#bfSave', m.el).addEventListener('click', async (e) => {
     const err = $('#bfErr', m.el); err.textContent = '';
     const p = { partCode: $('#bfPart', m.el).value.trim(), customer: $('#bfCust', m.el).value, totalQty: $('#bfQty', m.el).value, remarks: $('#bfRemarks', m.el).value };
+    const prod = findProd();
+    if (!prod) { err.textContent = p.partCode ? p.partCode + ' isn’t in Products. Pick a part code from the list, or add the product under Dropdowns → Products.' : 'Choose the part code.'; return; }
+    p.partCode = prod.Part_Code;
+    if (!(num(p.totalQty) > 0) || Math.round(num(p.totalQty)) !== num(p.totalQty)) { err.textContent = 'Total quantity must be a whole number above 0.'; return; }
     if ($('#bfDate', m.el) && $('#bfDate', m.el).value) p.createdAt = new Date($('#bfDate', m.el).value).toISOString();
     const done = btnBusy(e.currentTarget);
     try {
@@ -1578,30 +1668,63 @@ ACT['void-batch'] = async (el) => {
    RECORD / EDIT A STAGE CARD
    ========================================================================= */
 function draftKey(b, s) { return 'bct_draft:' + S.session.username + ':' + b + ':' + s; }
-function fieldInput(f, value, b, existing) {
+// ctx: { src: why it is filled in ("As CMPL0058"), hint, options (extra choices) }
+function fieldInput(f, value, ctx) {
+  ctx = ctx || {};
   const id = 'cf_' + f.key;
-  const v = value === undefined || value === null ? '' : value;
-  const lab = `<label for="${id}">${esc(f.label)}${f.required ? ' <span class="req">*</span>' : ''}</label>`;
+  const v = blankV(value) ? '' : value;
+  const af = ctx.src ? ' af-on' : '';
+  const tag = ctx.src ? `<span class="af" title="Filled in for you. Check it.">${esc(ctx.src)}</span>` : '';
+  const lab = `<label for="${id}">${esc(f.label)}${f.required ? ' <span class="req">*</span>' : ''}${tag}</label>`;
+  const hint = `<div class="hint" data-hint="${f.key}">${esc(ctx.hint || '')}</div>`;
   if (f.type === 'auto') return `<div class="field">${lab.replace('<label', '<label data-auto="1"')}<div class="auto" id="${id}">${esc(v) || '—'}</div></div>`;
   if (f.type === 'film') {
-    return `<div class="field">${lab}<select id="${id}" data-key="${f.key}"><option value="">—</option>${S.D.films.map(x => `<option ${String(x.Film) === String(v) ? 'selected' : ''}>${esc(x.Film)}</option>`).join('')}</select></div>`;
+    return `<div class="field">${lab}<select id="${id}" data-key="${f.key}" class="${af}"><option value="">—</option>${S.D.films.map(x => `<option ${String(x.Film) === String(v) ? 'selected' : ''}>${esc(x.Film)}</option>`).join('')}</select></div>`;
   }
   if (f.type === 'list') {
-    const opts = (S.D.lists[f.list] || []).slice();
-    if (v && opts.indexOf(String(v)) === -1) opts.unshift(String(v));
-    return `<div class="field">${lab}<input id="${id}" data-key="${f.key}" list="${id}_l" value="${esc(v)}" autocomplete="off"><datalist id="${id}_l">${opts.map(o => `<option value="${esc(o)}">`).join('')}</datalist></div>`;
+    // A list is picked from, never typed: typing is how "Viran" and "Viren" both end up in the records.
+    const opts = mergeOptions(S.D.lists[f.list] || [], ctx.options || [], v ? [String(v)] : []);
+    return `<div class="field">${lab}<select id="${id}" data-key="${f.key}" data-pick="1" class="${af}"><option value="">—</option>${opts.map(o => `<option ${o === String(v) ? 'selected' : ''}>${esc(o)}</option>`).join('')}<option value="__other">Other…</option></select>
+      <input id="${id}_o" class="hidden" maxlength="80" placeholder="Type the new ${esc(f.label.toLowerCase())}" style="margin-top:6px">${hint}</div>`;
   }
   if (f.type === 'enum') {
-    return `<div class="field">${lab}<div class="chips" data-key="${f.key}" data-enum="1">${f.options.map(o => `<button type="button" class="chip ${o === v ? 'on' : ''}" data-v="${esc(o)}">${esc(o)}</button>`).join('')}</div></div>`;
+    return `<div class="field">${lab}<div class="chips${af}" data-key="${f.key}" data-enum="1">${f.options.map(o => `<button type="button" class="chip ${o === v ? 'on' : ''}" data-v="${esc(o)}">${esc(o)}</button>`).join('')}</div></div>`;
   }
   if (f.type === 'datetime') {
     const iso = v ? new Date(new Date(v).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : '';
-    return `<div class="field">${lab}<input id="${id}" data-key="${f.key}" type="datetime-local" value="${iso}"></div>`;
+    return `<div class="field">${lab}<div class="now-wrap"><input id="${id}" data-key="${f.key}" type="datetime-local" value="${iso}"><button type="button" class="btn btn-ghost btn-sm" data-now="${id}">Now</button></div>${hint}</div>`;
   }
   if (f.type === 'int' || f.type === 'dec') {
-    return `<div class="field">${lab}<div class="unit-wrap"><input id="${id}" data-key="${f.key}" type="number" inputmode="decimal" step="${f.type === 'int' ? '1' : 'any'}" value="${esc(v)}">${f.unit ? `<span class="unit">${esc(f.unit)}</span>` : ''}</div></div>`;
+    return `<div class="field">${lab}<div class="unit-wrap"><input id="${id}" data-key="${f.key}" class="${af}" type="number" inputmode="decimal" step="${f.type === 'int' ? '1' : 'any'}" min="0" value="${esc(v)}">${f.unit ? `<span class="unit">${esc(f.unit)}</span>` : ''}</div>${hint}</div>`;
   }
-  return `<div class="field">${lab}<input id="${id}" data-key="${f.key}" value="${esc(v)}" maxlength="200"></div>`;
+  const dl = (ctx.options || []).length ? `<datalist id="${id}_l">${ctx.options.map(o => `<option value="${esc(o)}">`).join('')}</datalist>` : '';
+  return `<div class="field">${lab}<input id="${id}" data-key="${f.key}" class="${af}" value="${esc(v)}" maxlength="200" ${dl ? `list="${id}_l" autocomplete="off"` : ''}>${dl}${hint}</div>`;
+}
+function mergeOptions() {
+  const seen = {}, out = [];
+  Array.from(arguments).forEach(list => list.forEach(x => { const t = String(x).trim(), u = t.toUpperCase(); if (t && !seen[u]) { seen[u] = 1; out.push(t); } }));
+  return out;
+}
+// "Viran" against "Viren": an edit distance of 1–2 on a short name is a likely slip.
+function nearName(v, list) {
+  const a = String(v).trim().toLowerCase();
+  if (!a) return null;
+  const dist = (x, y) => { const d = []; for (let i = 0; i <= x.length; i++) { d[i] = [i]; for (let j = 1; j <= y.length; j++) d[i][j] = i ? Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (x[i - 1] === y[j - 1] ? 0 : 1)) : j; } return d[x.length][y.length]; };
+  let best = null;
+  list.forEach(o => { const b = String(o).trim().toLowerCase(); if (b === a) return; const k = dist(a.replace(/\s+/g, ''), b.replace(/\s+/g, '')); if (k <= (a.length > 5 ? 2 : 1) && (!best || k < best.k)) best = { k, v: o }; });
+  return best ? best.v : null;
+}
+function pickValue(el, id) {
+  const i = $('#' + id, el);
+  if (!i) return '';
+  if (i.tagName === 'SELECT' && i.value === '__other') return ($('#' + id + '_o', el).value || '').trim();
+  return i.value.trim();
+}
+function wirePick(el) {
+  $$('select[data-pick]', el).forEach(sel => sel.addEventListener('change', () => {
+    const o = $('#' + sel.id + '_o', el);
+    if (o) { o.classList.toggle('hidden', sel.value !== '__other'); if (sel.value === '__other') o.focus(); }
+  }));
 }
 
 async function openCardForm(batchNo, stageKey, editing) {
@@ -1613,38 +1736,65 @@ async function openCardForm(batchNo, stageKey, editing) {
   const product = S.D.products.find(p => String(p.Part_Code).toUpperCase() === String(b.Part_Code).toUpperCase()) || {};
   const win = cardOf(batchNo, 'WIN') || {};
   const draft = !editing && load(draftKey(batchNo, stageKey), true);
-  const val = (f) => {
-    if (existing) return existing[f.key];
-    if (draft && draft.fields && draft.fields[f.key] !== undefined) return draft.fields[f.key];
-    if (f.from === 'product') return product[f.key] !== undefined ? product[f.key] : '';
-    if (f.from === 'winding') return win[f.key] || '';
-    return '';
+  const mine = (!editing && load(lastKey(stageKey), true)) || {};
+  // Each field's value and, when the app filled it in, where from.
+  const fillOf = (f) => {
+    if (existing) return { v: existing[f.key] };
+    if (draft && draft.fields && draft.fields[f.key] !== undefined) return { v: draft.fields[f.key] };
+    if (f.from === 'product' && !blankV(product[f.key])) return { v: product[f.key], src: 'Product' };
+    if (f.from === 'winding' && !blankV(win[f.key])) return { v: win[f.key], src: 'Winding' };
+    if (f.fill === 'device' && mine.fields && !blankV(mine.fields[f.key])) return { v: mine.fields[f.key], src: 'Your last' };
+    if (f.fill) { const pv = pastValue(stageKey, batchNo, f.key, f.fill === 'setting'); if (pv) return { v: pv.v, src: 'As ' + pv.from }; }
+    return { v: '' };
   };
+  const ctxOf = (f) => {
+    const fv = fillOf(f), c = { src: fv.src };
+    if (f.check) { const past = pastNumbers(stageKey, batchNo, f.key); if (past.length) { const lo = Math.min.apply(null, past), hi = Math.max.apply(null, past); c.hint = 'Earlier batches: ' + (lo === hi ? fmtNum(lo) : fmtNum(lo) + '–' + fmtNum(hi)); } }
+    if (f.type === 'list' || f.type === 'text') c.options = distinctPast([stageKey], f.key);
+    if (f.type === 'datetime') c.hint = durationHint(stageKey, batchNo);
+    return c;
+  };
+  const filled = {};
+  st.fields.forEach(f => { filled[f.key] = fillOf(f); });
   const total = existing ? existing.Total_Qty : draft && draft.totalQty !== undefined ? draft.totalQty : prev ? num(prev.Good_Qty !== '' ? prev.Good_Qty : prev.Total_Qty) : num(b.Total_Qty);
   const media = Object.assign({}, existing ? { Photo_1: existing.Photo_1, Photo_2: existing.Photo_2 } : {}, draft && draft.media || {});
   const reasonsList = S.D.lists['Reject Reasons'] || [];
   const curReasons = reasonSplit(existing ? existing.Reject_Reason : draft && draft.rejectReason);
-  const opList = S.D.lists[st.operatorList] || [];
-  const operator = existing ? existing.Operator : draft && draft.operator || '';
-  const supName = existing ? existing.Sup_Signed_By : draft && draft.supName || '';
+  const opList = mergeOptions(S.D.lists[st.operatorList] || [], distinctPast([stageKey], 'Operator'));
+  let operator = existing ? existing.Operator : draft && draft.operator || '', opSrc = '';
+  if (!existing && !operator) {
+    if (mine.operator) { operator = mine.operator; opSrc = 'Your last'; }
+    else if (opList.length === 1) { operator = opList[0]; opSrc = 'Only one'; }
+  }
+  let supName = existing ? existing.Sup_Signed_By : draft && draft.supName || '', supSrc = '';
+  if (!existing && !supName) {
+    if (mine.supName) { supName = mine.supName; supSrc = 'Your last'; }
+    else if (S.D.me && S.D.me.name) { supName = S.D.me.name; supSrc = 'You'; }
+  }
+  const supNames = mergeOptions(S.D.me && S.D.me.name ? [S.D.me.name] : [], distinctPast(stages().map(x => x.key), 'Sup_Signed_By'));
+  const prevGood = prev ? num(prev.Good_Qty !== '' ? prev.Good_Qty : prev.Total_Qty) : null;
+  const allOk = st.fields.filter(f => f.type === 'enum' && f.options.indexOf('OK') > -1);
   const signedCard = existing && signed(existing);
   const m = openModal(modalHead(editing ? 'Edit · Stage ' + st.no : 'Record · Stage ' + st.no, st.name + ' — ' + b.Batch_No,
       esc(b.Product_Name || b.Part_Code) + ' · ' + esc(b.Customer_Name || '') + (prev ? ' · ' + fmtNum(prev.Good_Qty) + ' good from ' + esc(prevSt.name) : '')) +
     `<div class="modal-body">${draft ? '<div class="note">Your unsaved entry was kept on this phone and is filled in below.</div>' : ''}
       <div class="fsec">Quantity</div>
-      <div class="qty-row"><div class="field"><label>Total <span class="req">*</span></label><input id="cfTotal" type="number" inputmode="numeric" min="1" step="1" value="${esc(total)}"></div>
+      <div class="qty-row"><div class="field"><label>Total <span class="req">*</span>${!existing && !(draft && draft.totalQty !== undefined) ? `<span class="af">${prev ? 'Good from ' + esc(prevSt.short) : 'Batch total'}</span>` : ''}</label><input id="cfTotal" type="number" inputmode="numeric" min="1" step="1" value="${esc(total)}"></div>
         ${st.rejects ? `<div class="field"><label>Rejected</label><input id="cfReject" type="number" inputmode="numeric" min="0" step="1" value="${esc(existing ? existing.Reject_Qty : draft && draft.rejectQty || 0)}"></div>` : '<div></div>'}
         <div class="field"><label>Good</label><div class="good-box" id="cfGood">0</div></div></div>
       ${st.rejects ? `<div class="field hidden" id="cfReasonWrap"><label>Reject reason <span class="req">*</span></label><div class="chips" id="cfReasons">${reasonsList.map(r => `<button type="button" class="chip ${curReasons.indexOf(r) > -1 ? 'on' : ''}" data-v="${esc(r)}">${esc(r)}</button>`).join('')}</div>
         <input id="cfReasonOther" placeholder="Other reason" value="${esc(curReasons.filter(r => reasonsList.indexOf(r) === -1).join('; '))}" style="margin-top:6px"></div>` : ''}
       <div class="fsec">Readings</div>
-      <div class="form-grid">${st.fields.map(f => fieldInput(f, val(f), b, existing)).join('')}
-        <div class="field"><label>Operator <span class="req">*</span></label><input id="cfOperator" list="cfOps" value="${esc(operator)}" autocomplete="off"><datalist id="cfOps">${opList.map(o => `<option value="${esc(o)}">`).join('')}</datalist></div></div>
+      ${allOk.length > 1 && !existing ? `<button type="button" class="btn btn-ghost btn-sm" id="cfAllOk" style="margin-bottom:10px">${ico('check')} All checks OK</button>` : ''}
+      <div class="form-grid">${st.fields.map(f => fieldInput(f, filled[f.key].v, ctxOf(f))).join('')}
+        <div class="field"><label for="cfOperator">Operator <span class="req">*</span>${opSrc ? `<span class="af">${esc(opSrc)}</span>` : ''}</label>
+          <select id="cfOperator" data-pick="1" class="${opSrc ? 'af-on' : ''}"><option value="">—</option>${mergeOptions(opList, operator ? [operator] : []).map(o => `<option ${o === operator ? 'selected' : ''}>${esc(o)}</option>`).join('')}<option value="__other">Other…</option></select>
+          <input id="cfOperator_o" class="hidden" maxlength="80" placeholder="Operator's name" style="margin-top:6px"></div></div>
       <div class="fsec">Photos</div>
       <div class="capture">${st.photos.map(p => `<div class="cap" data-photo="${p.key}" tabindex="0">${ico('cam')}<span>${esc(p.label)}</span></div>`).join('')}</div>
       <div class="fsec">Production Supervisor</div>
       ${existing && existing.Sup_Signature ? `<div class="note">Signed${existing.Sup_Signed_By ? ' by ' + esc(existing.Sup_Signed_By) : ''}. <button type="button" class="btn btn-ghost btn-sm" id="cfResign">Sign again</button></div>` : ''}
-      <div id="cfSigWrap" class="${existing && existing.Sup_Signature ? 'hidden' : ''}"><div class="field" style="margin-bottom:10px"><label>Supervisor’s name</label><input id="cfSupName" value="${esc(supName)}" maxlength="80"></div>${sigPadHtml('cfSig', 'Production Supervisor signs here')}</div>
+      <div id="cfSigWrap" class="${existing && existing.Sup_Signature ? 'hidden' : ''}"><div class="field" style="margin-bottom:10px"><label for="cfSupName">Supervisor’s name${supSrc ? `<span class="af">${esc(supSrc)}</span>` : ''}</label><input id="cfSupName" class="${supSrc ? 'af-on' : ''}" value="${esc(supName)}" maxlength="80" list="cfSupNames" autocomplete="off"><datalist id="cfSupNames">${supNames.map(o => `<option value="${esc(o)}">`).join('')}</datalist></div>${sigPadHtml('cfSig', 'Production Supervisor signs here')}</div>
       <div class="field"><label>Remarks</label><textarea id="cfRemarks" maxlength="1000">${esc(existing ? existing.Remarks : draft && draft.remarks || '')}</textarea></div>
       ${signedCard ? '<div class="field"><label>Why change a PQA-signed card <span class="req">*</span></label><input id="cfWhy" maxlength="300"></div>' : ''}
       <div class="form-error" id="cfErr"></div></div>
@@ -1655,10 +1805,58 @@ async function openCardForm(batchNo, stageKey, editing) {
   const uploads = {};   // key -> promise of fileId
   const cur = Object.assign({}, media);
 
-  const good = () => { const t = num($('#cfTotal', el).value), r = st.rejects ? num($('#cfReject', el).value) : 0; $('#cfGood', el).textContent = fmtNum(Math.max(0, t - r)); if (st.rejects) $('#cfReasonWrap', el).classList.toggle('hidden', !(r > 0)); };
+  const goodNow = () => Math.max(0, num($('#cfTotal', el).value) - (st.rejects ? num($('#cfReject', el).value) : 0));
+  const boxes = $('#cf_Total_Boxes', el), caps = $('#cf_Caps_Per_Box', el);
+  if (boxes && existing && !blankV(existing.Total_Boxes)) boxes.dataset.touched = '1';
+  const calcBoxes = () => {
+    if (!boxes || !caps || boxes.dataset.touched) return;
+    const c = num(caps.value), g = goodNow();
+    boxes.value = c > 0 && g > 0 ? Math.ceil(g / c) : '';
+    const tagEl = boxes.closest('.field').querySelector('label');
+    if (!tagEl.querySelector('.af')) tagEl.insertAdjacentHTML('beforeend', '<span class="af">Good ÷ per box</span>');
+  };
+  if (boxes) boxes.addEventListener('input', () => { boxes.dataset.touched = '1'; });
+  if (caps) caps.addEventListener('input', calcBoxes);
+  const good = () => { $('#cfGood', el).textContent = fmtNum(goodNow()); if (st.rejects) $('#cfReasonWrap', el).classList.toggle('hidden', !(num($('#cfReject', el).value) > 0)); calcBoxes(); };
   ['#cfTotal', '#cfReject'].forEach(s => { const i = $(s, el); if (i) i.addEventListener('input', good); });
   good();
-  $$('[data-enum] .chip', el).forEach(c => c.addEventListener('click', () => { $$('.chip', c.parentNode).forEach(x => x.classList.remove('on')); c.classList.add('on'); }));
+  wirePick(el);
+  // Anything changed by hand loses its "filled in" mark.
+  el.addEventListener('input', e => { const f = e.target.closest('.field'); if (f) { f.querySelectorAll('.af-on').forEach(x => x.classList.remove('af-on')); const t = f.querySelector('label .af'); if (t) t.remove(); } });
+  $$('[data-now]', el).forEach(btn => btn.addEventListener('click', () => {
+    const i = $('#' + btn.dataset.now, el), d = new Date();
+    i.value = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    i.dispatchEvent(new Event('input', { bubbles: true }));
+  }));
+  // Readings: compared with earlier batches as they are typed.
+  st.fields.filter(f => f.check).forEach(f => {
+    const i = $('#cf_' + f.key, el), h = $(`[data-hint="${f.key}"]`, el);
+    if (!i || !h) return;
+    const past = pastNumbers(stageKey, batchNo, f.key), base = h.textContent;
+    const show = () => {
+      const r = readingCheck(i.value, past);
+      const html = r ? esc(r.msg) + (r.fix !== null ? ` <button type="button" class="linkish" data-fix="${r.fix}">Use ${esc(fmtNum(r.fix))}</button>` : '') : esc(base);
+      if (h._html === html) return;   // unchanged: keep the button under the finger
+      h._html = html;
+      h.classList.toggle('warn', !!r);
+      h.innerHTML = html;
+      const fx = $('[data-fix]', h);
+      if (fx) {
+        fx.addEventListener('mousedown', ev => ev.preventDefault());
+        fx.addEventListener('click', () => { i.value = fx.dataset.fix; i.dispatchEvent(new Event('input', { bubbles: true })); saveDraft(); });
+      }
+    };
+    i.addEventListener('input', show); i.addEventListener('blur', show);
+    if (!blankV(i.value)) show();
+  });
+  if ($('#cfAllOk', el)) $('#cfAllOk', el).addEventListener('click', () => {
+    allOk.forEach(f => { const box = $(`[data-key="${f.key}"]`, el); $$('.chip', box).forEach(c => c.classList.toggle('on', c.dataset.v === 'OK')); });
+    saveDraft();
+  });
+  $$('[data-enum] .chip', el).forEach(c => c.addEventListener('click', () => {
+    $$('.chip', c.parentNode).forEach(x => x.classList.remove('on')); c.classList.add('on');
+    c.parentNode.classList.remove('af-on'); const t = c.closest('.field').querySelector('label .af'); if (t) t.remove();
+  }));
   $$('#cfReasons .chip', el).forEach(c => c.addEventListener('click', () => c.classList.toggle('on')));
   const filmSel = $('#cf_Film', el);
   if (filmSel) filmSel.addEventListener('change', () => {
@@ -1716,11 +1914,11 @@ async function openCardForm(batchNo, stageKey, editing) {
       if (f.type === 'auto') return;
       if (f.type === 'enum') { const on = $(`[data-key="${f.key}"] .chip.on`, el); fields[f.key] = on ? on.dataset.v : ''; return; }
       const i = $('#cf_' + f.key, el); if (!i) return;
-      fields[f.key] = f.type === 'datetime' ? (i.value ? new Date(i.value).toISOString() : '') : i.value.trim();
+      fields[f.key] = f.type === 'datetime' ? (i.value ? new Date(i.value).toISOString() : '') : pickValue(el, 'cf_' + f.key);
     });
     const reasons = st.rejects ? $$('#cfReasons .chip.on', el).map(c => c.dataset.v).concat(reasonSplit($('#cfReasonOther', el).value)) : [];
     return { fields, totalQty: $('#cfTotal', el).value, rejectQty: st.rejects ? $('#cfReject', el).value : 0, rejectReason: reasons.join('; '),
-             operator: $('#cfOperator', el).value.trim(), remarks: $('#cfRemarks', el).value, supName: $('#cfSupName', el) ? $('#cfSupName', el).value.trim() : '' };
+             operator: pickValue(el, 'cfOperator'), remarks: $('#cfRemarks', el).value, supName: $('#cfSupName', el) ? $('#cfSupName', el).value.trim() : '' };
   }
   const saveDraft = debounce(() => { if (editing) return; const c = collect(); c.media = cur; store(draftKey(batchNo, stageKey), c); }, 400);
   el.addEventListener('input', saveDraft); el.addEventListener('click', saveDraft);
@@ -1735,6 +1933,19 @@ async function openCardForm(batchNo, stageKey, editing) {
     const needSig = !(existing && existing.Sup_Signature && $('#cfSigWrap', el).classList.contains('hidden'));
     if (needSig && pad.isEmpty()) { err.textContent = 'The Production Supervisor must sign.'; return; }
     if (signedCard && !$('#cfWhy', el).value.trim()) { err.textContent = 'Say why a signed card is being changed.'; return; }
+    if (st.rejects && num(c.rejectQty) > num(c.totalQty)) { err.textContent = 'Rejected can’t be more than the total.'; return; }
+    const tIn = c.fields.Time_In ? new Date(c.fields.Time_In).getTime() : 0, tOut = c.fields.Time_Out ? new Date(c.fields.Time_Out).getTime() : 0;
+    if (tIn && tOut && tOut < tIn) { err.textContent = 'Time out is before time in.'; return; }
+    if ((tIn && tIn > Date.now() + 15 * 60000) || (tOut && tOut > Date.now() + 15 * 60000)) { err.textContent = 'A time is in the future.'; return; }
+    // Things that are allowed but are usually a slip: asked about once, before saving.
+    const warns = [];
+    if (prevGood !== null && num(c.totalQty) > prevGood) warns.push('Total ' + fmtNum(c.totalQty) + ' is more than the ' + fmtNum(prevGood) + ' good from ' + prevSt.name + '.');
+    st.fields.filter(f => f.check).forEach(f => { const r = readingCheck(c.fields[f.key], pastNumbers(stageKey, batchNo, f.key)); if (r) warns.push(f.label + ' ' + fmtNum(c.fields[f.key]) + (f.unit ? ' ' + f.unit : '') + ': ' + r.msg); });
+    const newVal = (label, v, list) => { if (!v || list.some(o => o.toUpperCase() === v.toUpperCase())) return; const near = nearName(v, list); warns.push(near ? label + ' “' + v + '” isn’t in the list. Did you mean “' + near + '”?' : label + ' “' + v + '” isn’t in the list. Check the spelling.'); };
+    newVal('Operator', c.operator, opList);
+    st.fields.filter(f => f.type === 'list').forEach(f => newVal(f.label, c.fields[f.key], mergeOptions(S.D.lists[f.list] || [], distinctPast([stageKey], f.key))));
+    if (c.supName && supNames.length && !supNames.some(o => o.toUpperCase() === c.supName.toUpperCase())) { const near = nearName(c.supName, supNames); if (near) warns.push('Supervisor “' + c.supName + '”: did you mean “' + near + '”?'); }
+    if (warns.length && !await confirmBox('Please check these before saving:', { title: 'Check before saving', eyebrow: st.name + ' — ' + batchNo, list: warns, ok: 'Save anyway', cancel: 'Go back' })) return;
     const done = btnBusy(e.currentTarget, Object.keys(uploads).length ? 'Finishing uploads…' : 'Saving…');
     try {
       await Promise.all(Object.values(uploads));
@@ -1746,6 +1957,11 @@ async function openCardForm(batchNo, stageKey, editing) {
       const d = await api('saveCard', params);
       d._stage = stageKey;
       store(draftKey(batchNo, stageKey));
+      if (!editing) {
+        const keep = { operator: c.operator, supName: c.supName, fields: {} };
+        st.fields.filter(f => f.fill === 'device').forEach(f => { keep.fields[f.key] = c.fields[f.key]; });
+        store(lastKey(stageKey), keep);
+      }
       m.close(); applyResult(d); flushAlerts();
       toast(editing ? 'Saved.' : st.name + ' recorded for ' + batchNo + '. PQA has been told.', 'ok');
       if (S.route.page !== 'batch') go('#/batch/' + batchNo + '/' + stageKey);

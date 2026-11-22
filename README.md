@@ -2,7 +2,7 @@
 
 The CALGAS capacitor batch card as a web app. It replaces the AppSheet "Batch Card Tracker".
 
-**Live:** https://calgas.github.io/Batch-Card-Tracker/ · **Version:** 1.0.2
+**Live:** https://calgas.github.io/Batch-Card-Tracker/ · **Version:** 1.1.0
 
 ## What it does
 
