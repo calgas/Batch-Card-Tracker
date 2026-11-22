@@ -1,0 +1,1987 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="app-version" content="1.0.0">
+<meta name="theme-color" content="#15181d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Batch Card Tracker · CALGAS</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="https://calgas.github.io/Stock-Management/logo/icon-192.png">
+<link rel="apple-touch-icon" href="https://calgas.github.io/Stock-Management/logo/icon-192.png">
+<link rel="preconnect" href="https://lh3.googleusercontent.com" crossorigin>
+<link rel="preconnect" href="https://script.google.com">
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"></noscript>
+<script>
+  // Theme and zoom before the first paint, so nothing flashes.
+  (function () {
+    try {
+      var t = localStorage.getItem('bct_theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', t);
+      var z = parseFloat(localStorage.getItem('bct_zoom') || '1');
+      if (z && z !== 1) document.documentElement.style.setProperty('--app-zoom', z);
+    } catch (e) {}
+  })();
+</script>
+<style>
+  :root {
+    --paper: #f3f0ea; --panel: #ffffff; --panel-2: #faf8f4;
+    --ink: #1c2024; --ink-soft: #5c6570; --ink-faint: #949ca6;
+    --rail: #15181d; --rail-deep: #0a0c0f; --rail-soft: #8f97a3; --rail-ink: #f3f0ea;
+    --line: #dfdacd; --line-soft: #eeeae1; --hover: #f7f4ee;
+    --copper: #b5652e; --copper-deep: #8a4a1e; --copper-soft: rgba(181, 101, 46, 0.12);
+    --azure: #3e6e97; --azure-soft: rgba(62, 110, 151, 0.12);
+    --indigo: #6b5fa8; --indigo-soft: rgba(107, 95, 168, 0.12);
+    --ok: #3f9e73; --ok-soft: rgba(63, 158, 115, 0.13);
+    --warn: #c99a3e; --warn-soft: rgba(201, 154, 62, 0.15);
+    --bad: #d9503a; --bad-soft: rgba(217, 80, 58, 0.12);
+    --radius: 14px; --radius-sm: 9px;
+    --shadow-sm: 0 1px 3px rgba(28, 32, 36, 0.06);
+    --shadow: 0 4px 14px rgba(28, 32, 36, 0.08);
+    --shadow-lift: 0 14px 30px -8px rgba(28, 32, 36, 0.22), 0 4px 10px -4px rgba(28, 32, 36, 0.1);
+    --ease: cubic-bezier(0.4, 0, 0.2, 1); --spring: cubic-bezier(0.25, 1.1, 0.32, 1);
+    --font: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --mono: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+    --app-zoom: 1;
+    --s1: #b5652e; --s2: #c98a3a; --s3: #b9a23c; --s4: #6f9a46; --s5: #3f9e73; --s6: #3e8c97; --s7: #3e6e97; --s8: #6b5fa8;
+  }
+  [data-theme="dark"] {
+    --paper: #14171c; --panel: #1b2028; --panel-2: #20262f;
+    --ink: #eceef2; --ink-soft: #a9afba; --ink-faint: #6b7280;
+    --line: #333a44; --line-soft: #252b34; --hover: #242a34;
+    --copper-soft: rgba(181, 101, 46, 0.22); --azure-soft: rgba(62, 110, 151, 0.22); --indigo-soft: rgba(107, 95, 168, 0.22);
+    --ok-soft: rgba(63, 158, 115, 0.2); --warn-soft: rgba(201, 154, 62, 0.2); --bad-soft: rgba(217, 80, 58, 0.2);
+    --shadow: 0 4px 14px rgba(0, 0, 0, 0.35); --shadow-lift: 0 14px 30px -8px rgba(0, 0, 0, 0.6);
+  }
+  * { box-sizing: border-box; }
+  html { zoom: var(--app-zoom); }
+  html, body { margin: 0; height: 100%; }
+  body { font-family: var(--font); background: var(--paper); color: var(--ink); font-size: 14px; line-height: 1.45;
+         -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; }
+  button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; }
+  input, select, textarea { font: inherit; color: inherit; }
+  a { color: var(--copper); }
+  .hidden { display: none !important; }
+  .mono { font-family: var(--mono); }
+  .muted { color: var(--ink-soft); } .faint { color: var(--ink-faint); }
+  ::selection { background: var(--copper-soft); }
+
+  /* ---------- buttons, fields ---------- */
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 40px; padding: 0 16px; border-radius: 10px;
+         font-weight: 600; font-size: 13.5px; transition: background .15s var(--ease), transform .12s var(--ease), box-shadow .15s; white-space: nowrap; }
+  .btn:active { transform: scale(0.97); }
+  .btn:disabled { opacity: .45; cursor: default; transform: none; }
+  .btn-primary { background: var(--copper); color: #fff; box-shadow: 0 2px 8px rgba(181,101,46,.3); }
+  .btn-primary:hover:not(:disabled) { background: var(--copper-deep); }
+  .btn-ghost { background: var(--panel); border: 1px solid var(--line); }
+  .btn-ghost:hover:not(:disabled) { background: var(--hover); }
+  .btn-ok { background: var(--ok); color: #fff; } .btn-bad { background: var(--bad); color: #fff; }
+  .btn-soft-bad { background: var(--bad-soft); color: var(--bad); }
+  .btn-sm { height: 32px; padding: 0 11px; font-size: 12.5px; border-radius: 8px; }
+  .btn-lg { height: 48px; padding: 0 22px; font-size: 15px; border-radius: 12px; }
+  .btn-block { width: 100%; }
+  a.btn { text-decoration: none; }
+  .icon-btn { width: 38px; height: 38px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; color: var(--ink-soft); }
+  .icon-btn:hover { background: var(--hover); color: var(--ink); }
+  .icon { width: 18px; height: 18px; flex: 0 0 auto; }
+  .spin { width: 16px; height: 16px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; display: inline-block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .field > label, .label { font-size: 11.5px; font-weight: 700; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .05em; }
+  .field .req { color: var(--bad); }
+  .input, .field input:not([type=checkbox]):not([type=file]), .field select, .field textarea {
+    width: 100%; min-height: 42px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2);
+    font-size: 14.5px; transition: border-color .15s, box-shadow .15s; }
+  .field textarea { min-height: 70px; resize: vertical; }
+  .input:focus, .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--copper); box-shadow: 0 0 0 3px var(--copper-soft); background: var(--panel); }
+  .field select, select.input { -webkit-appearance: none; appearance: none; padding-right: 34px; cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='M4 6.5L8 10.5L12 6.5' stroke='%23949ca6' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 11px center; background-size: 15px; }
+  .field .unit-wrap { position: relative; }
+  .field .unit-wrap input { padding-right: 52px; }
+  .field .unit { position: absolute; right: 11px; top: 50%; transform: translateY(-50%); font-size: 12px; color: var(--ink-faint); font-weight: 600; pointer-events: none; }
+  .field .auto { min-height: 42px; padding: 10px 12px; border-radius: 10px; background: var(--line-soft); color: var(--ink-soft); font-weight: 600; font-family: var(--mono); font-size: 13px; }
+  .hint { font-size: 12px; color: var(--ink-faint); }
+  .form-error { color: var(--bad); font-size: 13px; font-weight: 600; min-height: 0; }
+  .form-error:not(:empty) { padding: 9px 12px; background: var(--bad-soft); border-radius: 9px; }
+  .seg { display: inline-flex; gap: 2px; padding: 3px; background: var(--panel); border: 1px solid var(--line); border-radius: 11px; }
+  .seg button { padding: 7px 13px; border-radius: 8px; font-size: 13px; font-weight: 600; color: var(--ink-soft); white-space: nowrap; }
+  .seg button.on { background: var(--ink); color: var(--panel); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { padding: 7px 12px; border-radius: 99px; border: 1px solid var(--line); background: var(--panel); font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+  .chip.on { background: var(--copper-soft); border-color: var(--copper); color: var(--copper-deep); }
+  [data-theme="dark"] .chip.on { color: #e9a774; }
+  .badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 99px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+  .b-ok { background: var(--ok-soft); color: var(--ok); } .b-warn { background: var(--warn-soft); color: #a07617; }
+  .b-bad { background: var(--bad-soft); color: var(--bad); } .b-info { background: var(--azure-soft); color: var(--azure); }
+  .b-muted { background: var(--line-soft); color: var(--ink-soft); } .b-copper { background: var(--copper-soft); color: var(--copper); }
+  [data-theme="dark"] .b-warn { color: #e0b65c; }
+
+  /* ---------- splash / sign-in ---------- */
+  .center { min-height: 100%; display: flex; align-items: center; justify-content: center; padding: 24px; }
+  #splash { position: fixed; inset: 0; z-index: 100; background: var(--rail); color: var(--rail-ink); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; transition: opacity .35s var(--ease); }
+  #splash.fade { opacity: 0; pointer-events: none; }
+  .splash-logo { width: 68px; height: 68px; border-radius: 18px; background: linear-gradient(135deg, var(--copper), #e08a4d); display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 40px rgba(181,101,46,.45); }
+  .splash-title { font-size: 19px; font-weight: 700; letter-spacing: .01em; }
+  .splash-sub { font-size: 11px; letter-spacing: .18em; color: var(--rail-soft); text-transform: uppercase; margin-top: -12px; }
+  .splash-bar { width: 220px; height: 4px; border-radius: 99px; background: rgba(255,255,255,.08); overflow: hidden; }
+  .splash-bar span { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--copper), #f0a46a); border-radius: 99px; transition: width .3s var(--ease); }
+  .splash-meta { font-family: var(--mono); font-size: 12px; color: var(--rail-soft); display: flex; gap: 10px; }
+  .login-card { width: 100%; max-width: 400px; background: var(--panel); border-radius: 20px; padding: 30px 28px; box-shadow: var(--shadow-lift); }
+  .login-head { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
+  .login-head .splash-logo { width: 46px; height: 46px; border-radius: 13px; box-shadow: none; }
+  .login-head h1 { font-size: 19px; margin: 0; } .login-head p { margin: 2px 0 0; font-size: 12.5px; color: var(--ink-soft); }
+  .login-card form { display: flex; flex-direction: column; gap: 14px; }
+  .pw-wrap { position: relative; } .pw-wrap input { padding-right: 46px !important; }
+  .pw-eye { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 38px; height: 36px; border-radius: 8px; color: var(--ink-faint); display: flex; align-items: center; justify-content: center; }
+  .pw-eye:hover { color: var(--ink); }
+  .login-foot { margin-top: 16px; font-size: 12.5px; color: var(--ink-soft); text-align: center; }
+
+  /* ---------- app shell ---------- */
+  .shell { display: grid; grid-template-columns: 248px minmax(0, 1fr); height: calc(100vh / var(--app-zoom)); }
+  .rail { background: var(--rail); color: var(--rail-ink); display: flex; flex-direction: column; min-height: 0; }
+  .brand { display: flex; align-items: center; gap: 11px; padding: 20px 18px 16px; }
+  .brand .splash-logo { width: 36px; height: 36px; border-radius: 10px; box-shadow: none; }
+  .brand b { display: block; font-size: 14px; letter-spacing: .02em; } .brand small { display: block; font-size: 10px; color: var(--copper); letter-spacing: .16em; font-weight: 700; }
+  .nav { flex: 1; overflow-y: auto; padding: 6px 10px; display: flex; flex-direction: column; gap: 2px; scrollbar-width: none; }
+  .nav-link { display: flex; align-items: center; gap: 11px; padding: 9px 11px; border-radius: 10px; color: var(--rail-soft); font-weight: 500; font-size: 13.5px; text-decoration: none; position: relative; width: 100%; text-align: left; }
+  @media (hover: hover) { .nav-link:hover { background: rgba(255,255,255,.05); color: var(--rail-ink); } }
+  .nav-link.on { background: rgba(181,101,46,.16); color: #fff; }
+  .nav-link.on::before { content: ''; position: absolute; left: -10px; top: 9px; bottom: 9px; width: 3px; border-radius: 0 3px 3px 0; background: var(--copper); }
+  .nav-link .count { margin-left: auto; font-family: var(--mono); font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 99px; background: rgba(255,255,255,.07); color: var(--rail-soft); }
+  .nav-link .count.hot { background: var(--copper); color: #fff; }
+  .nav-sec { font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: #59606b; font-weight: 700; padding: 16px 11px 6px; }
+  .nav-stage { padding: 7px 11px 7px 13px; font-size: 13px; }
+  .nav-stage .dot { width: 8px; height: 8px; border-radius: 3px; flex: 0 0 8px; }
+  .rail-foot { padding: 12px 14px 16px; border-top: 1px solid rgba(255,255,255,.06); display: flex; align-items: center; gap: 10px; }
+  .avatar { width: 34px; height: 34px; border-radius: 10px; background: rgba(255,255,255,.08); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; color: #fff; flex: 0 0 auto; }
+  .rail-foot .who { min-width: 0; flex: 1; } .rail-foot .who b { display: block; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rail-foot .who small { display: block; font-size: 11px; color: var(--rail-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rail-foot .icon-btn { color: var(--rail-soft); } .rail-foot .icon-btn:hover { background: rgba(255,255,255,.06); color: #fff; }
+  .main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .topbar { display: flex; align-items: center; gap: 10px; padding: 12px 26px; border-bottom: 1px solid var(--line); background: var(--paper); position: relative; z-index: 5; }
+  .topbar h2 { margin: 0; font-size: 19px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .topbar .crumb { font-size: 11px; color: var(--ink-faint); font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+  .topbar .grow { flex: 1; min-width: 0; }
+  .search { position: relative; width: 300px; }
+  .search input { width: 100%; height: 40px; padding: 0 12px 0 36px; border-radius: 11px; border: 1px solid var(--line); background: var(--panel); font-size: 13.5px; }
+  .search input:focus { outline: none; border-color: var(--copper); box-shadow: 0 0 0 3px var(--copper-soft); }
+  .search .icon { position: absolute; left: 11px; top: 11px; color: var(--ink-faint); }
+  .search-pop { position: absolute; top: 46px; left: 0; right: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow-lift); max-height: 380px; overflow: auto; padding: 6px; z-index: 30; }
+  .search-pop button { display: flex; width: 100%; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 8px; text-align: left; }
+  .search-pop button:hover, .search-pop button.sel { background: var(--hover); }
+  .sync { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: var(--ink-faint); white-space: nowrap; }
+  .sync i { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
+  .sync.busy i { background: var(--warn); animation: pulse 1s infinite; } .sync.off i { background: var(--bad); }
+  @keyframes pulse { 50% { opacity: .35; } }
+  .zoom-ctl { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); height: 38px; }
+  .zoom-ctl button { width: 32px; height: 36px; font-weight: 700; color: var(--ink-soft); } .zoom-ctl button:hover { color: var(--ink); }
+  .zoom-ctl .zl { width: 46px; font-family: var(--mono); font-size: 11.5px; }
+  .content { flex: 1; overflow-y: auto; padding: 24px 26px 60px; scroll-behavior: smooth; }
+  .page { max-width: 1400px; margin: 0 auto; animation: pageIn .25s var(--ease); }
+  @keyframes pageIn { from { opacity: 0; transform: translateY(6px); } }
+  .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+  .page-head p { margin: 4px 0 0; color: var(--ink-soft); font-size: 13.5px; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 16px; }
+  .toolbar .grow { flex: 1; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-sm); }
+  .card-pad { padding: 18px 20px; }
+  .card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px 0; }
+  .card-head h3 { margin: 0; font-size: 15px; } .card-head p { margin: 3px 0 0; font-size: 12.5px; color: var(--ink-soft); }
+  .grid { display: grid; gap: 16px; }
+  .g-kpi { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .g-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); } .g-3 { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+  .empty { padding: 40px 20px; text-align: center; color: var(--ink-soft); }
+  .empty .big { font-size: 34px; margin-bottom: 6px; }
+  .skeleton { background: linear-gradient(90deg, var(--line-soft), var(--hover), var(--line-soft)); background-size: 200% 100%; animation: shimmer 1.2s infinite; border-radius: 8px; }
+  @keyframes shimmer { to { background-position: -200% 0; } }
+
+  /* ---------- KPI tiles ---------- */
+  .kpi { padding: 16px 18px; display: flex; flex-direction: column; gap: 6px; cursor: pointer; transition: transform .15s var(--spring), box-shadow .15s; position: relative; overflow: hidden; text-align: left; }
+  .kpi:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+  .kpi .k-label { font-size: 12px; font-weight: 600; color: var(--ink-soft); display: flex; align-items: center; gap: 7px; }
+  .kpi .k-val { font-size: 30px; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .kpi .k-sub { font-size: 12px; color: var(--ink-faint); }
+  .kpi .k-ico { width: 30px; height: 30px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; }
+  .kpi.alert .k-val { color: var(--bad); } .kpi.warn .k-val { color: #b78624; }
+
+  /* ---------- pipeline ---------- */
+  .pipeline { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 10px; padding: 16px 20px 20px; }
+  .pipe { border-radius: 12px; padding: 12px; background: var(--panel-2); border: 1px solid var(--line-soft); cursor: pointer; text-align: left; transition: border-color .15s, transform .15s var(--spring); }
+  .pipe:hover { border-color: var(--copper); transform: translateY(-2px); }
+  .pipe .p-no { font-family: var(--mono); font-size: 11px; font-weight: 600; color: var(--ink-faint); }
+  .pipe .p-name { font-weight: 700; font-size: 13px; margin: 2px 0 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pipe .p-count { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .pipe .p-meta { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .pipe .p-bar { height: 4px; border-radius: 99px; background: var(--line-soft); margin-top: 10px; overflow: hidden; }
+  .pipe .p-bar span { display: block; height: 100%; border-radius: 99px; }
+
+  /* ---------- lists ---------- */
+  .rows { display: flex; flex-direction: column; }
+  .row { display: flex; align-items: center; gap: 12px; padding: 11px 20px; border-top: 1px solid var(--line-soft); cursor: pointer; text-align: left; width: 100%; }
+  .row:hover { background: var(--hover); }
+  .row:first-child { border-top: 0; }
+  .row .r-main { flex: 1; min-width: 0; } .row .r-main b { font-size: 13.5px; } .row .r-main small { display: block; color: var(--ink-soft); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row .r-side { text-align: right; font-size: 12px; color: var(--ink-soft); white-space: nowrap; }
+  .thumb { width: 44px; height: 44px; border-radius: 10px; object-fit: cover; background: var(--line-soft); flex: 0 0 auto; display: block; }
+  .thumb.sm { width: 36px; height: 36px; border-radius: 8px; }
+  .thumb-ph { width: 44px; height: 44px; border-radius: 10px; background: var(--line-soft); display: flex; align-items: center; justify-content: center; color: var(--ink-faint); flex: 0 0 auto; font-family: var(--mono); font-size: 11px; font-weight: 700; }
+  .hbar { display: grid; grid-template-columns: 120px 1fr 44px; gap: 10px; align-items: center; padding: 6px 20px; font-size: 12.5px; }
+  .hbar .track { height: 10px; border-radius: 99px; background: var(--line-soft); overflow: hidden; }
+  .hbar .track span { display: block; height: 100%; border-radius: 99px; background: var(--copper); }
+  .hbar b { text-align: right; font-family: var(--mono); font-size: 12px; }
+  .weekchart { display: flex; align-items: flex-end; gap: 8px; height: 150px; padding: 10px 20px 0; }
+  .weekchart .wk { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px; height: 100%; justify-content: flex-end; }
+  .weekchart .wk span { width: 100%; max-width: 34px; border-radius: 6px 6px 3px 3px; background: linear-gradient(180deg, var(--copper), #d9884d); min-height: 3px; }
+  .weekchart .wk small { font-size: 10.5px; color: var(--ink-faint); font-family: var(--mono); }
+  .weekchart .wk b { font-size: 11.5px; font-family: var(--mono); }
+
+  /* ---------- batch board / list ---------- */
+  .board { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(250px, 1fr); gap: 12px; overflow-x: auto; padding-bottom: 12px; align-items: start; }
+  .col { background: var(--line-soft); border-radius: 14px; padding: 10px; min-height: 120px; }
+  [data-theme="dark"] .col { background: #171b21; }
+  .col-head { display: flex; align-items: center; gap: 8px; padding: 4px 6px 10px; font-weight: 700; font-size: 13px; }
+  .col-head .dot { width: 9px; height: 9px; border-radius: 3px; }
+  .col-head .n { margin-left: auto; font-family: var(--mono); font-size: 11.5px; color: var(--ink-soft); }
+  .bcard { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 11px; margin-bottom: 9px; cursor: pointer; display: flex; gap: 10px; text-align: left; width: 100%;
+           transition: transform .15s var(--spring), box-shadow .15s, border-color .15s; }
+  .bcard:hover { transform: translateY(-2px); box-shadow: var(--shadow); border-color: var(--copper); }
+  .bcard .bc-main { flex: 1; min-width: 0; }
+  .bcard .bc-top { display: flex; align-items: center; gap: 6px; }
+  .bcard .bc-no { font-family: var(--mono); font-weight: 700; font-size: 13px; }
+  .bcard .bc-prod { font-size: 12.5px; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 2px 0 6px; }
+  .bcard .bc-foot { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--ink-faint); flex-wrap: wrap; }
+  .steps { display: flex; gap: 2px; margin: 6px 0 5px; }
+  .steps i { flex: 1; height: 4px; border-radius: 2px; background: var(--line); }
+  .steps i.done { background: var(--ok); } .steps i.half { background: linear-gradient(90deg, var(--ok) 50%, var(--warn) 50%); } .steps i.hold { background: var(--bad); }
+  table.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .tbl th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-faint); font-weight: 700; padding: 10px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; position: sticky; top: 0; background: var(--panel); z-index: 1; }
+  .tbl td { padding: 10px 14px; border-bottom: 1px solid var(--line-soft); white-space: nowrap; }
+  .tbl tbody tr { cursor: pointer; } .tbl tbody tr:hover td { background: var(--hover); }
+  .tbl .num { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--mono); font-size: 12.5px; }
+  .tbl-wrap { overflow: auto; max-height: calc(100vh / var(--app-zoom) - 240px); border-radius: var(--radius); }
+
+  /* ---------- batch page ---------- */
+  .bhead { padding: 20px 22px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; }
+  .bhead .b-no { font-family: var(--mono); font-size: 26px; font-weight: 700; letter-spacing: -.01em; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .bhead .b-prod { font-size: 15px; font-weight: 600; margin-top: 2px; }
+  .bhead .b-meta { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 8px; font-size: 12.5px; color: var(--ink-soft); }
+  .bhead .b-meta b { color: var(--ink); font-weight: 600; }
+  .bactions { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; justify-content: flex-end; }
+  .bstats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border-top: 1px solid var(--line-soft); }
+  .bstats div { padding: 12px 18px; border-left: 1px solid var(--line-soft); } .bstats div:first-child { border-left: 0; }
+  .bstats small { display: block; font-size: 11px; color: var(--ink-faint); font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+  .bstats b { font-size: 20px; font-variant-numeric: tabular-nums; }
+  .stepper { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 6px; padding: 16px 20px; }
+  .st { text-align: center; position: relative; cursor: pointer; padding: 4px 2px; border-radius: 10px; }
+  .st:hover { background: var(--hover); }
+  .st .st-c { width: 34px; height: 34px; border-radius: 50%; margin: 0 auto 6px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px;
+              border: 2px solid var(--line); background: var(--panel); color: var(--ink-faint); position: relative; z-index: 1; }
+  .st::after { content: ''; position: absolute; top: 21px; left: calc(50% + 20px); right: calc(-50% + 20px); height: 2px; background: var(--line); }
+  .st:last-child::after { display: none; }
+  .st.done .st-c { background: var(--ok); border-color: var(--ok); color: #fff; } .st.done::after { background: var(--ok); }
+  .st.wait .st-c { border-color: var(--warn); color: #a07617; background: var(--warn-soft); }
+  .st.next .st-c { border-color: var(--copper); color: var(--copper); box-shadow: 0 0 0 4px var(--copper-soft); }
+  .st.hold .st-c { border-color: var(--bad); color: var(--bad); }
+  .st small { display: block; font-size: 11.5px; font-weight: 600; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .st em { display: block; font-style: normal; font-size: 10.5px; color: var(--ink-faint); }
+  .scard { margin-top: 14px; overflow: hidden; scroll-margin-top: 20px; }
+  .scard-head { display: flex; align-items: center; gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--line-soft); }
+  .scard-head .sn { width: 30px; height: 30px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; font-size: 13px; flex: 0 0 auto; }
+  .scard-head h4 { margin: 0; font-size: 15px; } .scard-head p { margin: 1px 0 0; font-size: 12px; color: var(--ink-soft); }
+  .scard-head .acts { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+  .scard-body { padding: 14px 20px 18px; display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 20px; }
+  .readings { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+  .rd { background: var(--panel-2); border: 1px solid var(--line-soft); border-radius: 10px; padding: 8px 11px; }
+  .rd small { display: block; font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-faint); font-weight: 700; }
+  .rd b { font-size: 14px; font-weight: 600; word-break: break-word; }
+  .rd.q b { font-family: var(--mono); font-size: 16px; }
+  .rd.bad b { color: var(--bad); } .rd.good b { color: var(--ok); }
+  .media-col { display: flex; flex-direction: column; gap: 10px; }
+  .photos { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .photo { position: relative; border-radius: 11px; overflow: hidden; background: var(--line-soft); aspect-ratio: 4 / 3; cursor: zoom-in; border: 1px solid var(--line-soft); }
+  .photo img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .25s var(--ease); }
+  .photo:hover img { transform: scale(1.04); }
+  .photo span { position: absolute; left: 6px; bottom: 6px; right: 6px; font-size: 10.5px; color: #fff; font-weight: 600; text-shadow: 0 1px 3px rgba(0,0,0,.7); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .photo.none { cursor: default; display: flex; align-items: center; justify-content: center; color: var(--ink-faint); font-size: 11.5px; text-align: center; padding: 8px; }
+  .sigs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .sig { border: 1px dashed var(--line); border-radius: 10px; padding: 6px 8px; text-align: center; background: var(--panel-2); min-height: 82px; }
+  .sig img { height: 46px; max-width: 100%; object-fit: contain; display: block; margin: 0 auto; }
+  [data-theme="dark"] .sig img { filter: invert(1) hue-rotate(180deg); }
+  .sig small { display: block; font-size: 10.5px; color: var(--ink-faint); line-height: 1.3; }
+  .sig.wait { border-color: var(--warn); background: var(--warn-soft); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: #a07617; }
+  .note { font-size: 12.5px; padding: 8px 12px; border-radius: 9px; background: var(--line-soft); color: var(--ink-soft); margin-top: 10px; }
+  .note.warn { background: var(--warn-soft); color: #8d6a1f; } .note.bad { background: var(--bad-soft); color: var(--bad); }
+  .placeholder-card { margin-top: 14px; padding: 16px 20px; border: 1px dashed var(--line); border-radius: var(--radius); display: flex; align-items: center; gap: 12px; color: var(--ink-faint); }
+  .placeholder-card .sn { width: 30px; height: 30px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-weight: 700; background: var(--line-soft); }
+
+  /* ---------- modals ---------- */
+  .modal-bg { position: fixed; inset: 0; z-index: 60; background: rgba(12, 14, 18, .55); backdrop-filter: blur(3px); display: flex; align-items: center; justify-content: center; padding: 20px; animation: fadeIn .18s var(--ease); }
+  @keyframes fadeIn { from { opacity: 0; } }
+  .modal { width: 100%; max-width: 560px; max-height: calc(100vh / var(--app-zoom) - 40px); display: flex; flex-direction: column; background: var(--panel); border-radius: 18px; box-shadow: var(--shadow-lift); animation: popIn .22s var(--spring); }
+  .modal.wide { max-width: 860px; }
+  @keyframes popIn { from { opacity: 0; transform: translateY(12px) scale(.98); } }
+  .modal-head { display: flex; align-items: flex-start; gap: 12px; padding: 18px 22px 14px; border-bottom: 1px solid var(--line-soft); }
+  .modal-head .eyebrow { font-size: 10.5px; letter-spacing: .14em; font-weight: 700; color: var(--copper); text-transform: uppercase; }
+  .modal-head h3 { margin: 2px 0 0; font-size: 18px; } .modal-head p { margin: 3px 0 0; font-size: 12.5px; color: var(--ink-soft); }
+  .modal-head .icon-btn { margin-left: auto; }
+  .modal-body { padding: 18px 22px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
+  .modal-foot { padding: 14px 22px; border-top: 1px solid var(--line-soft); display: flex; gap: 10px; justify-content: flex-end; align-items: center; flex-wrap: wrap; }
+  .modal-foot .grow { flex: 1; }
+  .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  .form-grid .full { grid-column: 1 / -1; }
+  .fsec { font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-faint); display: flex; align-items: center; gap: 10px; }
+  .fsec::after { content: ''; flex: 1; height: 1px; background: var(--line-soft); }
+  .qty-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .good-box { border-radius: 10px; background: var(--ok-soft); color: var(--ok); font-weight: 700; font-size: 20px; font-family: var(--mono); padding: 7px 12px; min-height: 42px; }
+  .capture { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .cap { position: relative; border: 2px dashed var(--line); border-radius: 12px; aspect-ratio: 4 / 3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+         color: var(--ink-soft); font-size: 12.5px; font-weight: 600; cursor: pointer; overflow: hidden; background: var(--panel-2); text-align: center; padding: 6px; }
+  .cap:hover { border-color: var(--copper); color: var(--copper); }
+  .cap img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .cap .cap-state { position: absolute; left: 6px; bottom: 6px; z-index: 1; }
+  .cap .cap-x { position: absolute; right: 6px; top: 6px; z-index: 1; width: 28px; height: 28px; border-radius: 8px; background: rgba(0,0,0,.55); color: #fff; display: flex; align-items: center; justify-content: center; }
+  .cap input { display: none; }
+  .sigpad { border: 1px solid var(--line); border-radius: 12px; background: #fff; position: relative; touch-action: none; }
+  .sigpad canvas { width: 100%; height: 170px; display: block; border-radius: 12px; cursor: crosshair; }
+  .sigpad .sp-line { position: absolute; left: 18px; right: 18px; bottom: 38px; border-bottom: 1px dashed #c9c3b5; pointer-events: none; }
+  .sigpad .sp-hint { position: absolute; left: 18px; bottom: 14px; font-size: 11.5px; color: #a29b8c; pointer-events: none; }
+  .sigpad .sp-clear { position: absolute; right: 8px; top: 8px; }
+  .sigpad.done { border-color: var(--ok); box-shadow: 0 0 0 3px var(--ok-soft); }
+  .confirm-text { font-size: 14px; line-height: 1.55; }
+  #lightbox { position: fixed; inset: 0; z-index: 80; background: rgba(8, 9, 12, .92); display: flex; align-items: center; justify-content: center; padding: 30px; }
+  #lightbox img { max-width: 100%; max-height: 100%; border-radius: 10px; box-shadow: 0 20px 60px rgba(0,0,0,.6); }
+  #lightbox .lb-cap { position: absolute; bottom: 18px; left: 0; right: 0; text-align: center; color: #ddd; font-size: 13px; }
+  #lightbox .icon-btn { position: absolute; top: 16px; right: 16px; color: #fff; background: rgba(255,255,255,.1); }
+  #lightbox .lb-nav { position: absolute; top: 50%; transform: translateY(-50%); color: #fff; background: rgba(255,255,255,.1); width: 46px; height: 46px; border-radius: 12px; }
+  #lightbox .lb-prev { left: 16px; } #lightbox .lb-next { right: 16px; }
+  .scan-video { width: 100%; border-radius: 12px; background: #000; aspect-ratio: 4 / 3; object-fit: cover; }
+
+  /* ---------- toasts ---------- */
+  #toasts { position: fixed; z-index: 90; right: 20px; bottom: 20px; display: flex; flex-direction: column; gap: 8px; max-width: 380px; }
+  .toast { background: var(--ink); color: var(--panel); padding: 12px 16px; border-radius: 12px; box-shadow: var(--shadow-lift); font-size: 13.5px; font-weight: 500; display: flex; gap: 10px; align-items: flex-start; animation: toastIn .25s var(--spring); }
+  .toast.bad { background: var(--bad); color: #fff; } .toast.ok { background: #2f7a58; color: #fff; }
+  @keyframes toastIn { from { opacity: 0; transform: translateY(10px); } }
+
+  /* ---------- dropdowns page ---------- */
+  .dd-picker { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .dd-row { display: flex; align-items: center; gap: 10px; padding: 9px 16px; border-top: 1px solid var(--line-soft); }
+  .dd-row .grow { flex: 1; min-width: 0; font-weight: 500; }
+  .dd-row .icon-btn { width: 32px; height: 32px; }
+  .dd-add { display: flex; gap: 8px; padding: 14px 16px; }
+  .apps { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+  .app-tile { padding: 16px; display: flex; gap: 12px; align-items: center; text-decoration: none; color: inherit; transition: transform .15s var(--spring), box-shadow .15s; }
+  .app-tile:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+  .app-tile .ai { width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; flex: 0 0 auto; }
+  .app-tile b { display: block; } .app-tile small { color: var(--ink-soft); font-size: 12px; }
+
+  /* ---------- phones ---------- */
+  .phone-only { display: none !important; }
+  @media (max-width: 1100px) {
+    .g-kpi { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .pipeline { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .scard-body { grid-template-columns: 1fr; }
+    .search { width: 220px; }
+  }
+  @media (max-width: 780px) {
+    .phone-only { display: revert !important; }
+    .nav-link.phone-only { display: flex !important; }
+    .desk-only { display: none !important; }
+    .shell { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; }
+    .rail { order: 2; flex-direction: row; padding: 0 4px calc(4px + env(safe-area-inset-bottom)); border-top: 1px solid rgba(255,255,255,.06); }
+    .brand, .rail-foot, .nav-sec, .nav-stage, .nav .desk { display: none !important; }
+    .nav { flex-direction: row; justify-content: space-around; padding: 6px 0 2px; gap: 0; overflow: visible; }
+    .nav-link { flex-direction: column; gap: 3px; padding: 6px 4px; font-size: 10.5px; width: auto; flex: 1; align-items: center; text-align: center; }
+    .nav-link.on::before { display: none; }
+    .nav-link .count { position: absolute; top: 0; right: calc(50% - 22px); margin: 0; padding: 0 5px; font-size: 9.5px; }
+    .nav-link .icon { width: 22px; height: 22px; }
+    .topbar { padding: 10px 14px; gap: 6px; padding-top: calc(10px + env(safe-area-inset-top)); }
+    .topbar h2 { font-size: 17px; }
+    .search { width: auto; flex: 1; min-width: 0; }
+    .search-pop { position: fixed; left: 10px; right: 10px; top: calc(62px + env(safe-area-inset-top)); }
+    .content { padding: 14px 12px 30px; }
+    .g-kpi { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .g-2, .g-3 { grid-template-columns: minmax(0, 1fr); }
+    .kpi .k-val { font-size: 25px; }
+    .pipeline { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 12px; }
+    .bhead { grid-template-columns: 1fr; padding: 16px; }
+    .bactions { justify-content: flex-start; }
+    .bstats { grid-template-columns: repeat(3, 1fr); } .bstats div:nth-child(4) { border-left: 0; }
+    .stepper { grid-template-columns: repeat(4, 1fr); row-gap: 12px; padding: 12px; }
+    .st:nth-child(4)::after { display: none; }
+    .scard-head { flex-wrap: wrap; padding: 12px 14px; } .scard-head .acts { width: 100%; justify-content: flex-start; margin-left: 0; }
+    .scard-body { padding: 12px 14px 14px; }
+    .readings { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .modal-bg { padding: 0; align-items: flex-end; }
+    .modal, .modal.wide { max-width: none; border-radius: 18px 18px 0 0; max-height: calc(100vh / var(--app-zoom) - 30px); }
+    .form-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
+    .qty-row { gap: 8px; }
+    .board { grid-auto-columns: minmax(78vw, 1fr); }
+    .toolbar .seg { width: 100%; overflow-x: auto; } .toolbar .seg button { flex: 1; }
+    #toasts { left: 12px; right: 12px; bottom: 84px; max-width: none; }
+    .tbl-wrap { max-height: none; }
+    .hbar { grid-template-columns: 96px 1fr 36px; padding: 6px 14px; }
+  }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></symbol>
+  <symbol id="i-batches" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="7" height="16" rx="2"/><rect x="14" y="4" width="7" height="10" rx="2"/></symbol>
+  <symbol id="i-pqa" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6z"/><path d="m8.5 12 2.5 2.5 4.5-5"/></symbol>
+  <symbol id="i-stages" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="6" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="18" r="2"/><path d="M7 6h5a3 3 0 0 1 3 3v0M14 12h2a3 3 0 0 1 3 3v1"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="1.5"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 0 0-14.9-3M4 4v4h4M4 13a8 8 0 0 0 14.9 3M20 20v-4h-4"/></symbol>
+  <symbol id="i-out" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H3"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="i-cam" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></symbol>
+  <symbol id="i-pen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/></symbol>
+  <symbol id="i-qr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM18 18h3v3h-3zM14 20h2M20 14v2"/></symbol>
+  <symbol id="i-pdf" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 14h8M8 17h5"/></symbol>
+  <symbol id="i-hold" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M10 9v6M14 9v6"/></symbol>
+  <symbol id="i-box" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18 9 12l6-6"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17h.01"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.1 4M6.6 6.6A17 17 0 0 0 2 12s3.5 7 10 7a9.7 9.7 0 0 0 4.4-1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13 7 4 4"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 15 6-6 6 6"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></symbol>
+</svg>
+
+<div id="splash">
+  <div class="splash-logo"><svg class="icon" style="width:34px;height:34px;color:#fff"><use href="#i-batches"/></svg></div>
+  <div class="splash-title">Batch Card Tracker</div>
+  <div class="splash-sub">CALGAS Capacitors</div>
+  <div class="splash-bar"><span id="splashBar"></span></div>
+  <div class="splash-meta"><span id="splashPct">0%</span><span id="splashMsg">Starting…</span></div>
+</div>
+
+<div id="loginView" class="center hidden">
+  <div class="login-card">
+    <div class="login-head">
+      <div class="splash-logo"><svg class="icon" style="width:24px;height:24px;color:#fff"><use href="#i-batches"/></svg></div>
+      <div><h1>Batch Card Tracker</h1><p>Sign in with your Stock Management account</p></div>
+    </div>
+    <form id="loginForm" autocomplete="on">
+      <div class="field"><label for="loginUser">Username or email</label><input id="loginUser" autocomplete="username" required></div>
+      <div class="field"><label for="loginPass">Password</label>
+        <div class="pw-wrap"><input id="loginPass" type="password" autocomplete="current-password" required>
+          <button type="button" class="pw-eye" data-eye="loginPass" aria-label="Show password"><svg class="icon"><use href="#i-eye"/></svg></button></div></div>
+      <div class="form-error" id="loginError"></div>
+      <button class="btn btn-primary btn-lg btn-block" id="loginBtn" type="submit">Sign in</button>
+    </form>
+    <div class="login-foot">Forgot your password? Reset it in <a href="https://calgas.github.io/Stock-Management/" target="_blank" rel="noopener">Stock Management</a>.</div>
+  </div>
+</div>
+
+<div id="appView" class="shell hidden">
+  <aside class="rail">
+    <div class="brand"><div class="splash-logo"><svg class="icon" style="width:20px;height:20px;color:#fff"><use href="#i-batches"/></svg></div>
+      <div><b>Batch Card Tracker</b><small>CALGAS</small></div></div>
+    <nav class="nav" id="nav"></nav>
+    <div class="rail-foot">
+      <div class="avatar" id="meAvatar"></div>
+      <div class="who"><b id="meName"></b><small id="meRole"></small></div>
+      <button class="icon-btn" id="signOutBtn" title="Sign out" aria-label="Sign out"><svg class="icon"><use href="#i-out"/></svg></button>
+    </div>
+  </aside>
+  <div class="main">
+    <header class="topbar">
+      <button class="icon-btn hidden" id="backBtn" aria-label="Back"><svg class="icon"><use href="#i-back"/></svg></button>
+      <div class="grow desk-only"><div class="crumb" id="crumb"></div><h2 id="pageTitle"></h2></div>
+      <h2 class="phone-only" id="pageTitlePhone" style="flex:0 1 auto"></h2>
+      <div class="search" id="searchBox">
+        <svg class="icon"><use href="#i-search"/></svg>
+        <input id="searchInput" placeholder="Find a batch, part or customer" autocomplete="off" aria-label="Search">
+        <div class="search-pop hidden" id="searchPop"></div>
+      </div>
+      <button class="icon-btn" id="scanBtn" title="Scan a batch QR" aria-label="Scan a batch QR"><svg class="icon"><use href="#i-qr"/></svg></button>
+      <span class="sync desk-only" id="sync"><i></i><span id="syncText">Up to date</span></span>
+      <div class="zoom-ctl desk-only" role="group" aria-label="Zoom"><button data-zoom="-1" aria-label="Zoom out">−</button><button data-zoom="0" class="zl" id="zoomLabel">100%</button><button data-zoom="1" aria-label="Zoom in">+</button></div>
+      <button class="icon-btn desk-only" id="refreshBtn" title="Refresh" aria-label="Refresh"><svg class="icon"><use href="#i-refresh"/></svg></button>
+      <button class="icon-btn" id="themeBtn" title="Light or dark" aria-label="Light or dark"><svg class="icon"><use href="#i-moon"/></svg></button>
+      <button class="btn btn-primary desk-only hidden" id="newBatchBtn"><svg class="icon"><use href="#i-plus"/></svg>New batch</button>
+    </header>
+    <main class="content" id="content"></main>
+  </div>
+</div>
+
+<div id="modalRoot"></div>
+<div id="toasts"></div>
+<input type="file" id="fileInput" accept="image/*" capture="environment" class="hidden">
+
+<script>
+'use strict';
+/* =========================================================================
+   BATCH CARD TRACKER — web app
+   Signs in through Stock Management (app "bct"); everything else talks to
+   the Batch Card Tracker backend. Data arrives in one bootstrap request and
+   is kept on the device, so the app opens at once next time and refreshes
+   behind the figures already on screen.
+   ========================================================================= */
+
+const APP_VERSION = '1.0.0';
+const BCT_API_URL = 'https://script.google.com/macros/s/AKfycbxdCU4dK92I_Q5mlzhp9cEw_efeX5bVfkfLfqbNf_5eDpyj1RljUh0WqO-Y5-t3RhNZ/exec';
+const STOCK_API_URL = 'https://script.google.com/macros/s/AKfycbzs_aW0G-NvVvs-_Yk41d4esq1lkKVBTzQEQTrbbIKe7kQfoYdXD3cuhd6Wt2UQ6MU0/exec';
+const APP_URL = 'https://calgas.github.io/Batch-Card-Tracker/';
+const SESSION_KEY = 'bct_session';
+const STAGE_COLORS = ['var(--s1)', 'var(--s2)', 'var(--s3)', 'var(--s4)', 'var(--s5)', 'var(--s6)', 'var(--s7)', 'var(--s8)'];
+const DAY = 86400000, HOUR = 3600000;
+
+const S = {
+  session: null,      // { token, username, name, role, department }
+  D: null,            // bootstrap data
+  cardsBy: {},        // batchNo -> { WIN: card, ... }
+  batchBy: {},        // batchNo -> batch
+  inflight: 0,
+  lastSync: 0,
+  route: { page: 'overview' },
+  view: { batchFilter: 'open', batchView: 'board', batchSearch: '', customer: '', stageTab: {}, ddList: null },
+  localMedia: {},     // fileId -> object URL of what this device just uploaded
+  fgCatalog: null
+};
+
+/* ---------- small helpers ---------- */
+const $ = (sel, root) => (root || document).querySelector(sel);
+const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
+function esc(v) { return String(v === null || v === undefined ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function ico(name, cls) { return `<svg class="icon ${cls || ''}"><use href="#i-${name}"/></svg>`; }
+function num(v) { const n = Number(v); return isNaN(n) ? 0 : n; }
+function fmtNum(v) { return v === '' || v === null || v === undefined ? '—' : Number(v).toLocaleString('en-IN', { maximumFractionDigits: 4 }); }
+function pct(a, b) { return b ? Math.round(a / b * 1000) / 10 + '%' : '—'; }
+function uuid() { return (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)); }
+function dt(v, withTime) {
+  if (!v) return '';
+  const d = new Date(v);
+  if (isNaN(d)) return String(v);
+  const o = { day: '2-digit', month: 'short', year: 'numeric' };
+  if (withTime !== false) { o.hour = '2-digit'; o.minute = '2-digit'; o.hour12 = false; }
+  return d.toLocaleString('en-GB', o);
+}
+function ago(v) {
+  if (!v) return '';
+  const s = (Date.now() - new Date(v).getTime()) / 1000;
+  if (s < 60) return 'just now';
+  if (s < 3600) return Math.floor(s / 60) + ' min ago';
+  if (s < 86400) return Math.floor(s / 3600) + ' h ago';
+  if (s < 86400 * 30) return Math.floor(s / 86400) + ' d ago';
+  return dt(v, false);
+}
+function idleText(h) { if (h < 1) return 'active now'; const d = Math.floor(h / 24); return (d ? d + 'd ' : '') + Math.floor(h % 24) + 'h idle'; }
+function initials(name) { return String(name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join(''); }
+function nameOf(who) { if (!who) return ''; const n = S.D && S.D.names; return (n && (n[String(who).toLowerCase()])) || String(who).replace(/@.*/, ''); }
+function plural(n, w, p) { return fmtNum(n) + ' ' + (n === 1 ? w : (p || w + 's')); }
+function debounce(fn, ms) { let t; return function () { clearTimeout(t); const a = arguments; t = setTimeout(() => fn.apply(null, a), ms); }; }
+function store(k, v) { try { if (v === undefined) localStorage.removeItem(k); else localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v)); } catch (e) {} }
+function load(k, json) { try { const v = localStorage.getItem(k); return json ? JSON.parse(v || 'null') : v; } catch (e) { return null; } }
+
+/* ---------- toasts ---------- */
+function toast(msg, kind) {
+  const el = document.createElement('div');
+  el.className = 'toast ' + (kind === true ? 'bad' : kind || '');
+  el.innerHTML = `<span>${esc(msg)}</span>`;
+  $('#toasts').appendChild(el);
+  setTimeout(() => { el.style.transition = 'opacity .3s'; el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }, kind === true ? 6500 : 3800);
+}
+
+/* ---------- requests ---------- */
+const TIMEOUTS = { uploadMedia: 90000, makeBatchPdf: 150000, exportWorkbook: 150000, getBootstrap: 60000, getMedia: 45000 };
+function setSync(state, text) {
+  const el = $('#sync'); if (!el) return;
+  el.classList.toggle('busy', state === 'busy'); el.classList.toggle('off', state === 'off');
+  $('#syncText').textContent = text;
+}
+function syncIdle() { setSync(navigator.onLine === false ? 'off' : '', navigator.onLine === false ? 'Offline' : (S.lastSync ? 'Updated ' + ago(S.lastSync) : 'Up to date')); }
+async function post(url, action, params, timeout) {
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), timeout || 30000);
+  S.inflight++; setSync('busy', 'Saving…');
+  try {
+    const body = Object.assign({ action }, params || {});
+    if (S.session && !body.token && action !== 'login') body.token = S.session.token;
+    let res;
+    try {
+      res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body), signal: ctl.signal, redirect: 'follow' });
+    } catch (e) {
+      const err = new Error(ctl.signal.aborted ? 'The server took too long to answer.' : 'Can’t reach the server — check the connection.');
+      err.network = true; throw err;
+    }
+    const text = await res.text();
+    let json;
+    try { json = JSON.parse(text); } catch (e) {
+      const err = new Error(/accounts\.google|ServiceLogin/.test(text) ? 'Google asked for a sign-in: the web app must be deployed for "Anyone".' : 'Unexpected answer from the server (' + res.status + ').');
+      err.network = res.status >= 500; throw err;
+    }
+    if (!json.success) { const err = new Error(json.error || 'Something went wrong.'); err.code = json.code; throw err; }
+    return json.data;
+  } finally {
+    clearTimeout(t); S.inflight = Math.max(0, S.inflight - 1);
+    if (!S.inflight) syncIdle();
+  }
+}
+// Reads retry; a write retries only when it carries an ID that makes a
+// repeat harmless.
+async function api(action, params, opts) {
+  opts = opts || {};
+  const read = /^get[A-Z]/.test(action);
+  const tries = read || (params && params.clientTxnId) || opts.retry ? 3 : 1;
+  let last;
+  for (let i = 0; i < tries; i++) {
+    try { return await post(BCT_API_URL, action, params, TIMEOUTS[action]); }
+    catch (err) {
+      last = err;
+      if (err.code === 'SESSION') { sessionEnded(err.message); throw err; }
+      if (!err.network) throw err;
+      await new Promise(r => setTimeout(r, [1200, 3000, 6000][i]));
+    }
+  }
+  if (!read && last && last.network) last.message += ' It may have been saved — check before entering it again.';
+  throw last;
+}
+function stockApi(action, params, timeout) { return post(STOCK_API_URL, action, params, timeout || 45000); }
+
+/* ---------- session ---------- */
+function sessionEnded(msg) {
+  if (!S.session) return;
+  S.session = null; store(SESSION_KEY);
+  closeAllModals();
+  showLogin(msg || 'Your sign-in has ended — please sign in again.');
+}
+function showLogin(msg) {
+  hideSplash();
+  $('#appView').classList.add('hidden');
+  $('#loginView').classList.remove('hidden');
+  $('#loginError').textContent = msg || '';
+  setTimeout(() => $('#loginUser').focus(), 50);
+}
+async function doLogin(e) {
+  e.preventDefault();
+  const btn = $('#loginBtn'), err = $('#loginError');
+  err.textContent = '';
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Signing in…';
+  try {
+    const d = await stockApi('login', { username: $('#loginUser').value.trim(), password: $('#loginPass').value, app: 'bct' });
+    S.session = { token: d.token, username: d.username, name: d.name, role: d.role, department: d.department };
+    store(SESSION_KEY, S.session);
+    $('#loginPass').value = ''; $('#loginPass').type = 'password';
+    $('#loginView').classList.add('hidden');
+    showSplash(); await start();
+  } catch (x) { err.textContent = x.message; }
+  finally { btn.disabled = false; btn.textContent = 'Sign in'; }
+}
+async function signOut() {
+  if (!await confirmBox('Sign out of Batch Card Tracker on this device?', { title: 'Sign out', ok: 'Sign out' })) return;
+  const token = S.session && S.session.token;
+  S.session = null; store(SESSION_KEY);
+  stockApi('logout', { token }).catch(() => {});
+  location.hash = '';
+  showLogin('');
+}
+
+/* ---------- splash ---------- */
+let splashPct = 0;
+function showSplash() { const s = $('#splash'); s.classList.remove('hidden', 'fade'); setSplash(5, 'Starting…'); }
+function setSplash(p, msg) {
+  splashPct = Math.max(splashPct, p);
+  $('#splashBar').style.width = splashPct + '%'; $('#splashPct').textContent = Math.round(splashPct) + '%';
+  if (msg) $('#splashMsg').textContent = msg;
+}
+function hideSplash() { const s = $('#splash'); setSplash(100, 'Ready'); s.classList.add('fade'); setTimeout(() => s.classList.add('hidden'), 380); }
+
+/* ---------- data ---------- */
+function cacheKey() { return 'bct_cache:' + (S.session && S.session.username); }
+function applyData(D, from) {
+  S.D = D;
+  S.cardsBy = {}; S.batchBy = {};
+  D.batches.forEach(b => { S.batchBy[b.Batch_No] = b; S.cardsBy[b.Batch_No] = {}; });
+  D.stages.forEach(st => (D.cards[st.key] || []).forEach(c => { (S.cardsBy[c.Batch_No] = S.cardsBy[c.Batch_No] || {})[st.key] = c; }));
+  if (from !== 'cache') { S.lastSync = Date.now(); store(cacheKey(), JSON.stringify({ at: S.lastSync, v: APP_VERSION, D })); }
+}
+async function refresh(quiet) {
+  try {
+    const D = await api('getBootstrap', {});
+    applyData(D, 'server');
+    renderNav(); render();
+    if (!quiet) toast('Up to date', 'ok');
+  } catch (e) { if (e.code !== 'SESSION') { if (!quiet) toast(e.message, true); syncIdle(); } }
+}
+function stages() { return S.D ? S.D.stages : []; }
+function stageByKey(k) { return stages().find(s => s.key === k); }
+function cardOf(batchNo, key) { return (S.cardsBy[batchNo] || {})[key] || null; }
+function signed(c) { return !!(c && (c.PQA_Signature || c.PQA_At)); }
+
+// Where a batch stands: step 0–16, the stage it is at, what's next.
+function info(b) {
+  const step = num(b.Step);
+  const idx = Math.min(7, Math.floor(step / 2));
+  const st = stages()[idx];
+  const done = b.Status === 'Done' || step >= 16;
+  const hold = b.On_Hold === true || b.On_Hold === 'TRUE';
+  const last = b.Last_Activity || b.Created_At;
+  const idleH = last ? (Date.now() - new Date(last).getTime()) / HOUR : 0;
+  const waitingPqa = !done && step % 2 === 1;
+  const open = b.Status !== 'Void' && !done;
+  return { step, idx, stage: st, done, hold, open, waitingPqa, toRecord: open && !waitingPqa, idleH,
+           stuck: open && !hold && idleH >= ((S.D && S.D.settings.stuckHours) || 48), void: b.Status === 'Void',
+           label: b.Status === 'Void' ? 'Deleted' : done ? 'Completed' : hold ? 'On PQA hold' : waitingPqa ? st.name + ' · waiting for PQA' : st.name + ' · to record' };
+}
+function statusBadge(b) {
+  const i = info(b);
+  if (i.void) return '<span class="badge b-muted">Deleted</span>';
+  if (i.done) return '<span class="badge b-ok">' + ico('check') + ' Completed</span>';
+  if (i.hold) return '<span class="badge b-bad">' + ico('hold') + ' On hold</span>';
+  if (i.waitingPqa) return '<span class="badge b-warn">PQA · ' + esc(i.stage.short) + '</span>';
+  return '<span class="badge b-info">' + esc(i.stage.short) + '</span>';
+}
+function stepsBar(b) {
+  const i = info(b);
+  return '<div class="steps">' + stages().map((st, k) => {
+    const cls = i.step >= 2 * k + 2 ? 'done' : i.step === 2 * k + 1 ? (i.hold ? 'hold' : 'half') : (i.hold && i.idx === k ? 'hold' : '');
+    return `<i class="${cls}" title="${esc(st.name)}"></i>`;
+  }).join('') + '</div>';
+}
+function openBatches() { return S.D.batches.filter(b => info(b).open); }
+
+/* ---------- media ---------- */
+function mediaMode() { return (S.D && S.D.settings && S.D.settings.mediaMode) || 'public'; }
+function mediaSrc(id, w) {
+  if (!id || String(id).indexOf('missing:') === 0) return '';
+  if (S.localMedia[id]) return S.localMedia[id];
+  if (mediaMode() === 'proxy') return '';
+  return 'https://lh3.googleusercontent.com/d/' + encodeURIComponent(id) + '=w' + (w || 400);
+}
+function img(id, w, cls, alt) {
+  if (!id || String(id).indexOf('missing:') === 0) return '';
+  const src = mediaSrc(id, w);
+  return `<img class="${cls || ''}" data-mid="${esc(id)}" data-w="${w || 400}" ${src ? `src="${esc(src)}"` : ''} loading="lazy" decoding="async" alt="${esc(alt || '')}">`;
+}
+// lh3 → Drive's thumbnail service → this app's own script (and its cache).
+document.addEventListener('error', function (e) {
+  const im = e.target;
+  if (!im || im.tagName !== 'IMG' || !im.dataset.mid) return;
+  const id = im.dataset.mid, w = im.dataset.w || 400, tried = Number(im.dataset.tried || 0);
+  im.dataset.tried = tried + 1;
+  if (tried === 0 && mediaMode() !== 'proxy') im.src = 'https://drive.google.com/thumbnail?id=' + encodeURIComponent(id) + '&sz=w' + w;
+  else if (tried <= 1) proxyMedia(id, w).then(u => { if (u) im.src = u; }).catch(() => {});
+}, true);
+const proxyCache = {};
+async function proxyMedia(id, w) {
+  const key = id + ':' + (w > 400 ? 'full' : 'thumb');
+  if (proxyCache[key]) return proxyCache[key];
+  const cacheUrl = 'https://bct.local/media/' + key;
+  try {
+    const c = await caches.open('bct-media-v1');
+    const hit = await c.match(cacheUrl);
+    if (hit) return (proxyCache[key] = URL.createObjectURL(await hit.blob()));
+    const d = await api('getMedia', { id, size: w > 400 ? 0 : 400 });
+    const bytes = Uint8Array.from(atob(d.data), ch => ch.charCodeAt(0));
+    const blob = new Blob([bytes], { type: d.mime });
+    c.put(cacheUrl, new Response(blob)).catch(() => {});
+    return (proxyCache[key] = URL.createObjectURL(blob));
+  } catch (e) { return ''; }
+}
+function hydrateProxyImages(root) {
+  if (mediaMode() !== 'proxy') return;
+  $$('img[data-mid]:not([src])', root).forEach(im => proxyMedia(im.dataset.mid, im.dataset.w).then(u => { if (u) im.src = u; }));
+}
+
+/* ---------- modals ---------- */
+function openModal(html, opts) {
+  opts = opts || {};
+  const bg = document.createElement('div');
+  bg.className = 'modal-bg';
+  bg.innerHTML = `<div class="modal ${opts.wide ? 'wide' : ''}" role="dialog" aria-modal="true">${html}</div>`;
+  $('#modalRoot').appendChild(bg);
+  const close = () => { bg.remove(); if (opts.onClose) opts.onClose(); };
+  bg.addEventListener('mousedown', e => { if (e.target === bg && !opts.sticky) close(); });
+  $$('[data-close]', bg).forEach(b => b.addEventListener('click', close));
+  bg._close = close;
+  return { el: bg, close };
+}
+function closeAllModals() { $$('.modal-bg').forEach(m => m.remove()); }
+function modalHead(eyebrow, title, sub) {
+  return `<div class="modal-head"><div><div class="eyebrow">${esc(eyebrow)}</div><h3>${esc(title)}</h3>${sub ? `<p>${sub}</p>` : ''}</div>
+    <button class="icon-btn" data-close aria-label="Close">${ico('x')}</button></div>`;
+}
+function confirmBox(message, opts) {
+  opts = opts || {};
+  return new Promise(resolve => {
+    let answered = false;
+    const m = openModal(modalHead(opts.eyebrow || 'Please confirm', opts.title || 'Are you sure?') +
+      `<div class="modal-body"><div class="confirm-text">${esc(message)}</div></div>
+       <div class="modal-foot"><button class="btn btn-ghost" data-close>Cancel</button>
+       <button class="btn ${opts.danger ? 'btn-bad' : 'btn-primary'}" data-ok>${esc(opts.ok || 'OK')}</button></div>`,
+      { onClose: () => { if (!answered) resolve(false); } });
+    $('[data-ok]', m.el).addEventListener('click', () => { answered = true; m.close(); resolve(true); });
+    setTimeout(() => $('[data-ok]', m.el).focus(), 30);
+  });
+}
+// Asks for a reason; resolves with the text, or null.
+function reasonBox(title, label, opts) {
+  opts = opts || {};
+  return new Promise(resolve => {
+    let answered = false;
+    const m = openModal(modalHead(opts.eyebrow || 'Reason', title, opts.sub) +
+      `<div class="modal-body"><div class="field"><label>${esc(label)}</label><textarea id="rbText" maxlength="500" placeholder="${esc(opts.placeholder || '')}"></textarea></div>
+       <div class="form-error" id="rbErr"></div></div>
+       <div class="modal-foot"><button class="btn btn-ghost" data-close>Cancel</button><button class="btn ${opts.danger ? 'btn-bad' : 'btn-primary'}" data-ok>${esc(opts.ok || 'Save')}</button></div>`,
+      { onClose: () => { if (!answered) resolve(null); } });
+    const ta = $('#rbText', m.el);
+    setTimeout(() => ta.focus(), 30);
+    $('[data-ok]', m.el).addEventListener('click', () => {
+      const v = ta.value.trim();
+      if (v.length < 3 && !opts.optional) { $('#rbErr', m.el).textContent = 'Write a few words.'; return; }
+      answered = true; m.close(); resolve(v);
+    });
+  });
+}
+function btnBusy(btn, text) { if (!btn) return () => {}; const html = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spin"></span> ' + esc(text || 'Saving…'); return () => { btn.disabled = false; btn.innerHTML = html; }; }
+
+/* ---------- theme and zoom ---------- */
+const ZOOMS = [0.8, 0.9, 1, 1.1, 1.25, 1.4];
+function setTheme(t) {
+  document.documentElement.setAttribute('data-theme', t); store('bct_theme', t);
+  $('#themeBtn').innerHTML = ico(t === 'dark' ? 'sun' : 'moon');
+  const meta = document.querySelector('meta[name=theme-color]'); if (meta) meta.content = '#15181d';
+}
+function currentZoom() { return parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--app-zoom')) || 1; }
+function setZoom(z) {
+  z = Math.max(ZOOMS[0], Math.min(ZOOMS[ZOOMS.length - 1], z));
+  document.documentElement.style.setProperty('--app-zoom', z); store('bct_zoom', String(z));
+  $$('.zl').forEach(el => { el.textContent = Math.round(z * 100) + '%'; });
+}
+function stepZoom(d) { const z = currentZoom(); const i = ZOOMS.findIndex(x => Math.abs(x - z) < 0.01); setZoom(d === 0 ? 1 : ZOOMS[Math.max(0, Math.min(ZOOMS.length - 1, (i < 0 ? 2 : i) + d))]); }
+
+/* ---------- navigation ---------- */
+function go(hash) { if (location.hash === hash) render(); else location.hash = hash; }
+function parseRoute() {
+  const h = location.hash.replace(/^#\/?/, '').split('?')[0];
+  const [page, arg, extra] = h.split('/').map(decodeURIComponent);
+  if (page === 'batch' && arg) return { page: 'batch', batchNo: arg, card: extra };
+  if (page === 'stage' && arg) return { page: 'stage', key: arg };
+  const known = ['overview', 'batches', 'pqa', 'stages', 'dropdowns', 'more', 'apps', 'about', 'feedback'];
+  return { page: known.indexOf(page) > -1 ? page : 'overview' };
+}
+function navCounts() {
+  const c = { pqa: 0, hold: 0, stage: {} };
+  S.D.batches.forEach(b => {
+    const i = info(b);
+    if (!i.open) return;
+    if (i.hold) c.hold++;
+    if (i.waitingPqa) c.pqa++;
+    c.stage[i.stage.key] = (c.stage[i.stage.key] || 0) + 1;
+  });
+  return c;
+}
+function renderNav() {
+  if (!S.D) return;
+  const can = S.D.can, c = navCounts(), r = S.route;
+  const link = (hash, icon, label, on, count, hot, extra) => `<a class="nav-link ${on ? 'on' : ''} ${extra || ''}" href="${hash}">${ico(icon)}<span>${esc(label)}</span>${count ? `<span class="count ${hot ? 'hot' : ''}">${count}</span>` : ''}</a>`;
+  let html = link('#/overview', 'home', 'Overview', r.page === 'overview') +
+    link('#/batches', 'batches', 'Batches', r.page === 'batches' || r.page === 'batch') +
+    link('#/pqa', 'pqa', 'PQA', r.page === 'pqa', c.pqa + c.hold, c.pqa + c.hold > 0) +
+    link('#/stages', 'stages', 'Stages', r.page === 'stages' || r.page === 'stage', '', false, 'phone-only') +
+    '<div class="nav-sec">Stages</div>' +
+    stages().map((st, i) => `<a class="nav-link nav-stage ${r.page === 'stage' && r.key === st.key ? 'on' : ''}" href="#/stage/${st.key}"><span class="dot" style="background:${STAGE_COLORS[i]}"></span><span>${esc(st.name)}</span>${c.stage[st.key] ? `<span class="count">${c.stage[st.key]}</span>` : ''}</a>`).join('') +
+    '<div class="nav-sec">Manage</div>' +
+    (can.lists ? link('#/dropdowns', 'list', 'Dropdowns', r.page === 'dropdowns', '', false, 'desk') : '') +
+    link('#/apps', 'more', 'Apps', r.page === 'apps', '', false, 'desk') +
+    link('#/feedback', 'pen', 'Feedback', r.page === 'feedback', '', false, 'desk') +
+    link('#/about', 'alert', 'About', r.page === 'about', '', false, 'desk') +
+    link('#/more', 'more', 'More', ['more', 'apps', 'about', 'feedback', 'dropdowns'].indexOf(r.page) > -1, '', false, 'phone-only');
+  $('#nav').innerHTML = html;
+}
+function setTitle(crumb, title) {
+  $('#crumb').textContent = crumb || ''; $('#pageTitle').textContent = title; $('#pageTitlePhone').textContent = title;
+  document.title = title + ' · Batch Card Tracker';
+}
+function render() {
+  if (!S.D) return;
+  S.route = parseRoute();
+  renderNav();
+  const r = S.route, c = $('#content');
+  $('#backBtn').classList.toggle('hidden', r.page !== 'batch');
+  $('#newBatchBtn').classList.toggle('hidden', !S.D.can.create);
+  const pages = { overview: renderOverview, batches: renderBatches, pqa: renderPqa, stages: renderStagesIndex, stage: renderStage, batch: renderBatch,
+                  dropdowns: renderDropdowns, more: renderMore, apps: renderApps, about: renderAbout, feedback: renderFeedback };
+  const keepScroll = r.page === S._lastPage && r.batchNo === S._lastBatch;
+  const top = c.scrollTop;
+  c.innerHTML = '<div class="page">' + (pages[r.page] || renderOverview)(r) + '</div>';
+  hydrateProxyImages(c);
+  if (keepScroll) c.scrollTop = top; else c.scrollTop = 0;
+  if (r.page === 'batch' && r.card && !keepScroll) { const el = document.getElementById('card-' + r.card); if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60); }
+  S._lastPage = r.page; S._lastBatch = r.batchNo;
+  if (afterRender[r.page]) afterRender[r.page](r);
+}
+const afterRender = {};
+
+/* ---------- search ---------- */
+function searchMatches(q) {
+  q = q.trim().toLowerCase();
+  if (!q) return [];
+  return S.D.batches.filter(b => [b.Batch_No, b.Part_Code, b.Product_Name, b.Customer_Name].join(' ').toLowerCase().indexOf(q) > -1)
+    .sort((a, b) => (info(a).open === info(b).open ? String(b.Batch_No).localeCompare(String(a.Batch_No)) : info(a).open ? -1 : 1)).slice(0, 12);
+}
+function renderSearch() {
+  const q = $('#searchInput').value, pop = $('#searchPop');
+  const list = searchMatches(q);
+  if (!q.trim()) { pop.classList.add('hidden'); return; }
+  pop.innerHTML = list.length ? list.map((b, i) => `<button data-b="${esc(b.Batch_No)}" class="${i === 0 ? 'sel' : ''}">${batchThumb(b, 'sm')}<span style="flex:1;min-width:0"><b class="mono">${esc(b.Batch_No)}</b>
+      <small class="muted" style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(b.Product_Name || b.Part_Code)} · ${esc(b.Customer_Name || '')}</small></span>${statusBadge(b)}</button>`).join('')
+    : '<div class="empty" style="padding:16px">No batch matches.</div>';
+  pop.classList.remove('hidden');
+  hydrateProxyImages(pop);
+}
+function batchThumb(b, size) {
+  const w = cardOf(b.Batch_No, 'WIN');
+  const id = w && (w.Photo_1 || w.Photo_2);
+  return id ? img(id, 160, 'thumb ' + (size || ''), b.Batch_No) : `<div class="thumb-ph ${size || ''}">${esc(String(b.Batch_No).slice(-3))}</div>`;
+}
+
+/* ---------- start ---------- */
+async function start() {
+  setSplash(20, 'Loading your batch cards…');
+  const cached = load(cacheKey(), true);
+  if (cached && cached.D && Date.now() - cached.at < 7 * DAY) {
+    applyData(cached.D, 'cache');
+    S.lastSync = cached.at;
+    enterApp();
+    refresh(true);
+    return;
+  }
+  const t = setInterval(() => setSplash(Math.min(88, splashPct + 3)), 350);
+  try {
+    const D = await api('getBootstrap', {});
+    clearInterval(t);
+    setSplash(95, 'Almost there…');
+    applyData(D, 'server');
+    enterApp();
+  } catch (e) {
+    clearInterval(t);
+    if (e.code !== 'SESSION') showLogin(e.message + ' (you are still signed in — try again).');
+  }
+}
+function enterApp() {
+  $('#loginView').classList.add('hidden');
+  $('#appView').classList.remove('hidden');
+  const me = S.D.me;
+  $('#meName').textContent = me.name || me.username;
+  $('#meRole').textContent = [me.role, me.department].filter(Boolean).join(' · ');
+  $('#meAvatar').textContent = initials(me.name || me.username);
+  render();
+  hideSplash();
+  syncIdle();
+}
+
+function wire() {
+  $('#loginForm').addEventListener('submit', doLogin);
+  document.addEventListener('click', e => {
+    const eye = e.target.closest('[data-eye]');
+    if (eye) { const inp = document.getElementById(eye.dataset.eye); const show = inp.type === 'password'; inp.type = show ? 'text' : 'password'; eye.innerHTML = ico(show ? 'eye-off' : 'eye'); return; }
+    const z = e.target.closest('[data-zoom]');
+    if (z) { stepZoom(Number(z.dataset.zoom)); return; }
+    const a = e.target.closest('[data-act]');
+    if (a && ACT[a.dataset.act]) { e.preventDefault(); ACT[a.dataset.act](a, e); }
+  });
+  $('#signOutBtn').addEventListener('click', signOut);
+  $('#themeBtn').addEventListener('click', () => setTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'));
+  $('#refreshBtn').addEventListener('click', () => refresh(false));
+  $('#backBtn').addEventListener('click', () => { if (history.length > 1) history.back(); else go('#/batches'); });
+  $('#newBatchBtn').addEventListener('click', () => openBatchForm());
+  $('#scanBtn').addEventListener('click', openScan);
+  const si = $('#searchInput');
+  si.addEventListener('input', debounce(renderSearch, 80));
+  si.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { const first = $('#searchPop button'); if (first) { go('#/batch/' + first.dataset.b); si.value = ''; renderSearch(); si.blur(); } }
+    if (e.key === 'Escape') { si.value = ''; renderSearch(); si.blur(); }
+  });
+  $('#searchPop').addEventListener('click', e => { const b = e.target.closest('[data-b]'); if (b) { go('#/batch/' + b.dataset.b); si.value = ''; renderSearch(); } });
+  document.addEventListener('click', e => { if (!e.target.closest('#searchBox')) $('#searchPop').classList.add('hidden'); });
+  document.addEventListener('keydown', e => {
+    if (e.key === '/' && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) { e.preventDefault(); si.focus(); }
+    if (e.key === 'Escape') { const m = $$('.modal-bg').pop(); if (m && m._close) m._close(); const lb = $('#lightbox'); if (lb) lb.remove(); }
+  });
+  window.addEventListener('hashchange', render);
+  window.addEventListener('online', syncIdle); window.addEventListener('offline', syncIdle);
+  setInterval(() => { if (S.session && S.D && document.visibilityState === 'visible' && !S.inflight && !$('.modal-bg') && Date.now() - S.lastSync > 120000) refresh(true); }, 30000);
+  setInterval(() => { if (!S.inflight) syncIdle(); }, 30000);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && S.D && Date.now() - S.lastSync > 60000 && !$('.modal-bg')) refresh(true); });
+}
+
+const ACT = {};
+
+
+/* =========================================================================
+   OVERVIEW
+   ========================================================================= */
+function kpi(label, value, sub, icon, tone, hash, color) {
+  return `<a class="card kpi ${tone || ''}" href="${hash}" style="text-decoration:none;color:inherit">
+    <div class="k-label"><span class="k-ico" style="background:${color || 'var(--copper-soft)'};color:${tone === 'alert' ? 'var(--bad)' : tone === 'warn' ? '#b78624' : 'var(--copper)'}">${ico(icon)}</span>${esc(label)}</div>
+    <div class="k-val">${value}</div><div class="k-sub">${sub || '&nbsp;'}</div></a>`;
+}
+function allCards() { const out = []; stages().forEach((st, i) => (S.D.cards[st.key] || []).forEach(c => out.push({ st, i, c }))); return out; }
+function reasonSplit(r) { return String(r || '').split(/[;,]/).map(x => x.trim()).filter(Boolean); }
+
+function renderOverview() {
+  setTitle('Batch Card Tracker', 'Overview');
+  const B = S.D.batches.filter(b => b.Status !== 'Void');
+  const open = B.filter(b => info(b).open);
+  const pqa = open.filter(b => info(b).waitingPqa);
+  const hold = open.filter(b => info(b).hold);
+  const stuck = open.filter(b => info(b).stuck);
+  const now = new Date(), monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  const doneMonth = B.filter(b => info(b).done && b.Done_At && b.Done_At >= monthStart);
+  const done30 = B.filter(b => info(b).done && b.Done_At && b.Done_At >= Date.now() - 30 * DAY);
+  const tot30 = done30.reduce((s, b) => s + num(b.Total_Qty), 0), good30 = done30.reduce((s, b) => s + num(b.Good_Qty), 0);
+  const wip = open.reduce((s, b) => s + num(b.Good_Qty), 0);
+  const oldestPqa = pqa.slice().sort((a, b) => (a.Last_Activity || 0) - (b.Last_Activity || 0))[0];
+
+  const kpis = '<div class="grid g-kpi">' +
+    kpi('Open batches', fmtNum(open.length), fmtNum(wip) + ' pieces in progress', 'batches', '', '#/batches', 'var(--copper-soft)') +
+    kpi('Waiting for PQA', fmtNum(pqa.length), oldestPqa ? 'oldest ' + ago(oldestPqa.Last_Activity) : 'none waiting', 'pqa', pqa.length ? 'warn' : '', '#/pqa', 'var(--warn-soft)') +
+    kpi('On PQA hold', fmtNum(hold.length), hold.length ? hold.slice(0, 2).map(b => b.Batch_No).join(', ') : 'none held', 'hold', hold.length ? 'alert' : '', '#/pqa', 'var(--bad-soft)') +
+    kpi('No movement ' + S.D.settings.stuckHours + ' h+', fmtNum(stuck.length), stuck.length ? 'needs a push' : 'all moving', 'clock', stuck.length ? 'alert' : '', '#/batches?stuck', 'var(--bad-soft)') +
+    kpi('Completed this month', fmtNum(doneMonth.length), fmtNum(doneMonth.reduce((s, b) => s + num(b.Good_Qty), 0)) + ' good pieces', 'check', '', '#/batches', 'var(--ok-soft)') +
+    kpi('Yield, last 30 days', tot30 ? pct(good30, tot30) : '—', tot30 ? fmtNum(tot30 - good30) + ' rejected of ' + fmtNum(tot30) : 'no batch completed', 'box', '', '#/batches', 'var(--azure-soft)') +
+    '</div>';
+
+  const pipe = stages().map((st, i) => {
+    const here = open.filter(b => info(b).idx === i);
+    const rec = here.filter(b => !info(b).waitingPqa && !info(b).hold).length, wait = here.filter(b => info(b).waitingPqa && !info(b).hold).length, h = here.filter(b => info(b).hold).length;
+    const maxN = Math.max(1, ...stages().map((s2, k) => open.filter(b => info(b).idx === k).length));
+    return `<a class="pipe" href="#/stage/${st.key}" style="text-decoration:none;color:inherit"><div class="p-no">STAGE ${st.no}</div><div class="p-name">${esc(st.name)}</div>
+      <div class="p-count">${here.length}</div><div class="p-meta">${rec ? `<span class="badge b-info">${rec} to record</span>` : ''}${wait ? `<span class="badge b-warn">${wait} PQA</span>` : ''}${h ? `<span class="badge b-bad">${h} hold</span>` : ''}${!here.length ? '<span class="badge b-muted">clear</span>' : ''}</div>
+      <div class="p-bar"><span style="width:${Math.round(here.length / maxN * 100)}%;background:${STAGE_COLORS[i]}"></span></div></a>`;
+  }).join('');
+
+  // Needs attention: PQA waiting (oldest first), holds, stuck.
+  const att = [];
+  hold.forEach(b => att.push({ b, tone: 'b-bad', tag: 'On hold', text: b.Hold_Reason || 'PQA hold', at: b.Hold_At }));
+  pqa.filter(b => !info(b).hold).sort((a, b) => (a.Last_Activity || 0) - (b.Last_Activity || 0)).forEach(b => att.push({ b, tone: 'b-warn', tag: 'PQA', text: info(b).stage.name + ' waiting for sign-off', at: b.Last_Activity }));
+  stuck.filter(b => !info(b).waitingPqa).forEach(b => att.push({ b, tone: 'b-muted', tag: idleText(info(b).idleH), text: info(b).stage.name + ' not recorded yet', at: b.Last_Activity }));
+  const attHtml = att.length ? att.slice(0, 8).map(a => `<a class="row" href="#/batch/${esc(a.b.Batch_No)}" style="text-decoration:none;color:inherit">${batchThumb(a.b, 'sm')}
+      <div class="r-main"><b class="mono">${esc(a.b.Batch_No)}</b> <span class="badge ${a.tone}">${esc(a.tag)}</span><small>${esc(a.b.Product_Name || a.b.Part_Code)} · ${esc(a.text)}</small></div>
+      <div class="r-side">${ago(a.at)}</div></a>`).join('') + (att.length > 8 ? `<a class="row" href="#/pqa" style="justify-content:center;color:var(--copper);font-weight:600;text-decoration:none">${att.length - 8} more →</a>` : '')
+    : '<div class="empty"><div class="big">✓</div>Nothing waiting. Every batch is moving.</div>';
+
+  // Rejects in the last 30 days, by stage and by reason.
+  const since = Date.now() - 30 * DAY;
+  const rc = allCards().filter(x => x.c.Recorded_At >= since && num(x.c.Reject_Qty) > 0);
+  const byStage = stages().map((st, i) => ({ label: st.short, v: rc.filter(x => x.i === i).reduce((s, x) => s + num(x.c.Reject_Qty), 0), color: STAGE_COLORS[i] }));
+  const reasons = {};
+  rc.forEach(x => { const rs = reasonSplit(x.c.Reject_Reason); const share = num(x.c.Reject_Qty) / (rs.length || 1); (rs.length ? rs : ['Not given']).forEach(r => { reasons[r] = (reasons[r] || 0) + share; }); });
+  const byReason = Object.keys(reasons).map(k => ({ label: k, v: Math.round(reasons[k]) })).sort((a, b) => b.v - a.v).slice(0, 7);
+  const bars = (list) => { const m = Math.max(1, ...list.map(x => x.v)); return list.map(x => `<div class="hbar"><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(x.label)}</span><div class="track"><span style="width:${x.v / m * 100}%;${x.color ? 'background:' + x.color : ''}"></span></div><b>${fmtNum(x.v)}</b></div>`).join(''); };
+  const totalRej = byStage.reduce((s, x) => s + x.v, 0);
+
+  // Completed per week, last 8 weeks.
+  const weeks = [];
+  const monday = (d) => { const x = new Date(d); const day = (x.getDay() + 6) % 7; x.setHours(0, 0, 0, 0); x.setDate(x.getDate() - day); return x.getTime(); };
+  const w0 = monday(Date.now());
+  for (let k = 7; k >= 0; k--) { const s = w0 - k * 7 * DAY; weeks.push({ s, n: B.filter(b => b.Done_At && b.Done_At >= s && b.Done_At < s + 7 * DAY).length }); }
+  const wm = Math.max(1, ...weeks.map(w => w.n));
+  const weekHtml = '<div class="weekchart">' + weeks.map(w => `<div class="wk"><b>${w.n || ''}</b><span style="height:${Math.max(2, w.n / wm * 100)}%"></span><small>${new Date(w.s).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</small></div>`).join('') + '</div>';
+
+  // Recent activity.
+  const ev = [];
+  allCards().forEach(x => {
+    if (x.c.Recorded_At) ev.push({ at: x.c.Recorded_At, who: x.c.Recorded_By, text: `recorded ${x.st.name}`, b: x.c.Batch_No, color: STAGE_COLORS[x.i] });
+    if (x.c.PQA_At) ev.push({ at: x.c.PQA_At, who: x.c.PQA_By, text: `PQA signed ${x.st.name}`, b: x.c.Batch_No, color: 'var(--ok)' });
+  });
+  B.forEach(b => { if (b.Created_At) ev.push({ at: b.Created_At, who: b.Created_By, text: 'opened the batch', b: b.Batch_No, color: 'var(--ink-faint)' }); });
+  ev.sort((a, b) => b.at - a.at);
+  const evHtml = ev.slice(0, 10).map(e => `<a class="row" href="#/batch/${esc(e.b)}" style="text-decoration:none;color:inherit"><span style="width:9px;height:9px;border-radius:3px;background:${e.color};flex:0 0 9px"></span>
+      <div class="r-main"><b>${esc(nameOf(e.who) || 'Someone')}</b> <span class="muted">${esc(e.text)}</span> <span class="mono" style="font-weight:600">${esc(e.b)}</span></div><div class="r-side">${ago(e.at)}</div></a>`).join('') || '<div class="empty">No activity yet.</div>';
+
+  return `<div class="page-head"><div><h1 style="margin:0;font-size:24px">Good ${now.getHours() < 12 ? 'morning' : now.getHours() < 17 ? 'afternoon' : 'evening'}, ${esc((S.D.me.name || '').split(' ')[0])}</h1>
+      <p>${fmtNum(open.length)} batches on the floor · ${fmtNum(pqa.length)} waiting for PQA · ${dt(Date.now(), false)}</p></div>
+      ${S.D.can.create ? `<button class="btn btn-primary" data-act="new-batch">${ico('plus')}New batch</button>` : ''}</div>
+    ${kpis}
+    <div class="card" style="margin-top:16px"><div class="card-head"><div><h3>Where the batches are</h3><p>Open batches at each stage — tap a stage to work on it</p></div></div><div class="pipeline">${pipe}</div></div>
+    <div class="grid g-3" style="margin-top:16px">
+      <div class="card"><div class="card-head"><div><h3>Needs attention</h3><p>Holds, sign-offs waiting, batches not moving</p></div><a class="btn btn-ghost btn-sm" href="#/pqa">PQA queue</a></div><div class="rows" style="margin-top:10px">${attHtml}</div></div>
+      <div class="card"><div class="card-head"><div><h3>Completed per week</h3><p>Batches through Final Audit, last 8 weeks</p></div></div>${weekHtml}<div style="height:14px"></div></div>
+    </div>
+    <div class="grid g-3" style="margin-top:16px">
+      <div class="card"><div class="card-head"><div><h3>Recent activity</h3><p>Cards recorded and signed</p></div></div><div class="rows" style="margin-top:10px">${evHtml}</div></div>
+      <div class="card"><div class="card-head"><div><h3>Rejects, last 30 days</h3><p>${fmtNum(totalRej)} pieces · by stage, then by reason</p></div></div>
+        <div style="padding:10px 0 4px">${totalRej ? bars(byStage.filter(x => x.v)) : '<div class="empty">No rejects in 30 days.</div>'}</div>
+        ${byReason.length ? '<div style="border-top:1px solid var(--line-soft);padding:8px 0 12px">' + bars(byReason) + '</div>' : ''}</div>
+    </div>`;
+}
+
+/* =========================================================================
+   BATCHES
+   ========================================================================= */
+function filteredBatches() {
+  const v = S.view, q = v.batchSearch.trim().toLowerCase();
+  return S.D.batches.filter(b => {
+    const i = info(b);
+    if (v.batchFilter === 'open' && !i.open) return false;
+    if (v.batchFilter === 'pqa' && !(i.open && i.waitingPqa)) return false;
+    if (v.batchFilter === 'hold' && !(i.open && i.hold)) return false;
+    if (v.batchFilter === 'stuck' && !i.stuck) return false;
+    if (v.batchFilter === 'done' && !i.done) return false;
+    if (v.batchFilter === 'all' && i.void) return false;
+    if (v.customer && b.Customer_Name !== v.customer) return false;
+    if (q && [b.Batch_No, b.Part_Code, b.Product_Name, b.Customer_Name].join(' ').toLowerCase().indexOf(q) === -1) return false;
+    return true;
+  }).sort((a, b) => String(b.Batch_No).localeCompare(String(a.Batch_No), undefined, { numeric: true }));
+}
+function bcard(b) {
+  const i = info(b);
+  return `<a class="bcard" href="#/batch/${esc(b.Batch_No)}" style="text-decoration:none;color:inherit">${batchThumb(b)}
+    <div class="bc-main"><div class="bc-top"><span class="bc-no">${esc(b.Batch_No)}</span>${i.hold ? '<span class="badge b-bad">Hold</span>' : i.waitingPqa ? '<span class="badge b-warn">PQA</span>' : ''}${i.stuck && !i.hold ? `<span class="badge b-muted">${esc(idleText(i.idleH))}</span>` : ''}</div>
+    <div class="bc-prod">${esc(b.Product_Name || b.Part_Code)}</div>${stepsBar(b)}
+    <div class="bc-foot"><span>${esc(b.Customer_Name || '—')}</span><span>·</span><span class="mono">${fmtNum(b.Good_Qty)}/${fmtNum(b.Total_Qty)}</span></div></div></a>`;
+}
+function renderBatches() {
+  setTitle('Production', 'Batches');
+  if (location.hash.indexOf('?stuck') > -1) { S.view.batchFilter = 'stuck'; history.replaceState(null, '', '#/batches'); }
+  const v = S.view;
+  const list = filteredBatches();
+  const customers = Array.from(new Set(S.D.batches.map(b => b.Customer_Name).filter(Boolean))).sort();
+  const counts = { open: 0, pqa: 0, hold: 0, stuck: 0, done: 0 };
+  S.D.batches.forEach(b => { const i = info(b); if (i.open) counts.open++; if (i.open && i.waitingPqa) counts.pqa++; if (i.open && i.hold) counts.hold++; if (i.stuck) counts.stuck++; if (i.done) counts.done++; });
+  const segs = [['open', 'Open', counts.open], ['pqa', 'Waiting PQA', counts.pqa], ['hold', 'On hold', counts.hold], ['stuck', 'Not moving', counts.stuck], ['done', 'Completed', counts.done], ['all', 'All']];
+  let body;
+  if (!list.length) body = '<div class="card empty"><div class="big">🗂</div>No batches match.</div>';
+  else if (v.batchView === 'board' && v.batchFilter !== 'done') {
+    const cols = stages().map((st, i) => ({ st, i, items: list.filter(b => !info(b).done && info(b).idx === i) }));
+    const done = list.filter(b => info(b).done).slice(0, 30);
+    body = '<div class="board">' + cols.map(c => `<div class="col"><div class="col-head"><span class="dot" style="background:${STAGE_COLORS[c.i]}"></span>${esc(c.st.name)}<span class="n">${c.items.length}</span></div>
+        ${c.items.map(bcard).join('') || '<div class="faint" style="padding:10px;font-size:12.5px;text-align:center">—</div>'}</div>`).join('') +
+      (done.length ? `<div class="col"><div class="col-head"><span class="dot" style="background:var(--ok)"></span>Completed<span class="n">${done.length}</span></div>${done.map(bcard).join('')}</div>` : '') + '</div>';
+  } else {
+    body = `<div class="card tbl-wrap"><table class="tbl"><thead><tr><th>Batch</th><th>Product</th><th>Customer</th><th>Where</th><th class="num">Total</th><th class="num">Good</th><th class="num">Yield</th><th>Started</th><th>Last activity</th></tr></thead><tbody>` +
+      list.map(b => `<tr data-act="open-batch" data-b="${esc(b.Batch_No)}"><td><b class="mono">${esc(b.Batch_No)}</b></td><td>${esc(b.Product_Name || b.Part_Code)}<div class="faint mono" style="font-size:11px">${esc(b.Part_Code)}</div></td>
+        <td>${esc(b.Customer_Name || '')}</td><td>${statusBadge(b)}</td><td class="num">${fmtNum(b.Total_Qty)}</td><td class="num">${fmtNum(b.Good_Qty)}</td><td class="num">${pct(num(b.Good_Qty), num(b.Total_Qty))}</td>
+        <td>${dt(b.Created_At, false)}</td><td>${ago(b.Last_Activity)}</td></tr>`).join('') + '</tbody></table></div>';
+  }
+  return `<div class="page-head"><div><p style="margin:0">${plural(list.length, 'batch', 'batches')} shown</p></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-ghost" data-act="export">${ico('download')}Export to Excel</button>${S.D.can.create ? `<button class="btn btn-primary" data-act="new-batch">${ico('plus')}New batch</button>` : ''}</div></div>
+    <div class="toolbar"><div class="seg">${segs.map(s => `<button class="${v.batchFilter === s[0] ? 'on' : ''}" data-act="bfilter" data-v="${s[0]}">${s[1]}${s[2] !== undefined ? ` <span class="faint">${s[2]}</span>` : ''}</button>`).join('')}</div>
+      <input class="input" style="max-width:240px;flex:1" id="bSearch" placeholder="Filter by batch, part, customer" value="${esc(v.batchSearch)}">
+      <select class="input" style="max-width:200px" id="bCustomer"><option value="">All customers</option>${customers.map(c => `<option ${c === v.customer ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select>
+      <span class="grow"></span><div class="seg"><button class="${v.batchView === 'board' ? 'on' : ''}" data-act="bview" data-v="board">Board</button><button class="${v.batchView === 'list' ? 'on' : ''}" data-act="bview" data-v="list">List</button></div></div>
+    ${body}`;
+}
+afterRender.batches = () => {
+  const s = $('#bSearch');
+  if (s) s.addEventListener('input', debounce(() => { S.view.batchSearch = s.value; const pos = s.selectionStart; render(); const n = $('#bSearch'); n.focus(); n.setSelectionRange(pos, pos); }, 200));
+  const c = $('#bCustomer'); if (c) c.addEventListener('change', () => { S.view.customer = c.value; render(); });
+};
+ACT.bfilter = (el) => { S.view.batchFilter = el.dataset.v; render(); };
+ACT.bview = (el) => { S.view.batchView = el.dataset.v; render(); };
+ACT['open-batch'] = (el) => go('#/batch/' + el.dataset.b);
+ACT['new-batch'] = () => openBatchForm();
+
+/* =========================================================================
+   ONE BATCH
+   ========================================================================= */
+function reading(label, value, cls) { return `<div class="rd ${cls || ''}"><small>${esc(label)}</small><b>${value === '' || value === undefined || value === null ? '<span class="faint">—</span>' : esc(value)}</b></div>`; }
+function fieldValue(f, v) {
+  if (v === '' || v === undefined || v === null) return '';
+  if (f.type === 'datetime') return dt(v);
+  if (f.type === 'int' || f.type === 'dec') return fmtNum(v) + (f.unit ? ' ' + f.unit : '');
+  return String(v);
+}
+function canEditCard(c) { const can = S.D.can; return can.edit || (c.Recorded_By === S.D.me.username && !signed(c)); }
+
+function stageCardHtml(b, st, i, c) {
+  const inf = info(b);
+  const can = S.D.can;
+  const isLatest = !stages()[i + 1] || !cardOf(b.Batch_No, stages()[i + 1].key);
+  const acts = [];
+  if (!signed(c) && can.pqa && !inf.hold) acts.push(`<button class="btn btn-ok btn-sm" data-act="pqa-sign" data-b="${esc(b.Batch_No)}" data-s="${st.key}">${ico('pqa')}PQA sign-off</button>`);
+  if (canEditCard(c) && !inf.void) acts.push(`<button class="btn btn-ghost btn-sm" data-act="edit-card" data-b="${esc(b.Batch_No)}" data-s="${st.key}">${ico('edit')}Edit</button>`);
+  if (isLatest && !b.FG_TxnID && ((!signed(c) && (can.pqa || c.Recorded_By === S.D.me.username)) || can.del))
+    acts.push(`<button class="btn btn-soft-bad btn-sm" data-act="send-back" data-b="${esc(b.Batch_No)}" data-s="${st.key}">${ico('undo')}${signed(c) ? 'Remove' : 'Send back'}</button>`);
+  if (isLatest && signed(c) && can.edit && !inf.done) acts.push(`<button class="btn btn-ghost btn-sm" data-act="clear-pqa" data-b="${esc(b.Batch_No)}" data-s="${st.key}">Take back sign-off</button>`);
+  const q = `${reading('Total', fmtNum(c.Total_Qty), 'q')}${st.rejects ? reading('Rejected', fmtNum(c.Reject_Qty || 0), 'q ' + (num(c.Reject_Qty) ? 'bad' : '')) : ''}${reading('Good', fmtNum(c.Good_Qty), 'q good')}`;
+  const fields = st.fields.map(f => reading(f.label, fieldValue(f, c[f.key]))).join('');
+  const photos = st.photos.map((p, k) => c[p.key] && String(c[p.key]).indexOf('missing:') !== 0
+    ? `<div class="photo" data-act="lightbox" data-mid="${esc(c[p.key])}" data-cap="${esc(b.Batch_No + ' · ' + st.name + ' · ' + p.label)}">${img(c[p.key], 520, '', p.label)}<span>${esc(p.label)}</span></div>`
+    : `<div class="photo none">${c[p.key] ? 'Photo not found in the old app' : 'No ' + esc(p.label.toLowerCase())}</div>`).join('');
+  const sigBox = (id, label, who, at) => id && String(id).indexOf('missing:') !== 0
+    ? `<div class="sig">${img(id, 360, '', label)}<small><b>${esc(label)}</b><br>${esc(nameOf(who) || '')}${at ? ' · ' + dt(at) : ''}</small></div>`
+    : `<div class="sig wait">${esc(label)}<br>${label === 'PQA' ? 'waiting' : 'not signed'}</div>`;
+  let legacy = '';
+  if (c.Legacy) { try { const l = JSON.parse(c.Legacy); legacy = `<div class="note">From the AppSheet app: ${esc(l.from || '')}${l.tp && l.tp.PQA_By ? ' · Testing & Packing first signed by ' + esc(nameOf(l.tp.PQA_By)) : ''}.</div>`; } catch (e) {} }
+  return `<div class="card scard" id="card-${st.key}">
+    <div class="scard-head"><div class="sn" style="background:${STAGE_COLORS[i]}">${st.no}</div>
+      <div><h4>${esc(st.name)} ${signed(c) ? '<span class="badge b-ok">' + ico('check') + ' PQA signed</span>' : '<span class="badge b-warn">Waiting for PQA</span>'}</h4>
+      <p>Recorded by ${esc(nameOf(c.Recorded_By) || '—')} · ${dt(c.Recorded_At)}${c.Edited_At ? ' · edited by ' + esc(nameOf(c.Edited_By)) + ' ' + ago(c.Edited_At) : ''}</p></div>
+      <div class="acts">${acts.join('')}</div></div>
+    <div class="scard-body"><div><div class="readings">${q}${reading('Operator', c.Operator)}${fields}${c.Reject_Reason ? reading('Reject reason', c.Reject_Reason) : ''}</div>
+      ${c.Remarks ? `<div class="note">${esc(c.Remarks)}</div>` : ''}${c.PQA_Remarks ? `<div class="note">PQA: ${esc(c.PQA_Remarks)}</div>` : ''}${legacy}</div>
+      <div class="media-col"><div class="photos">${photos}</div><div class="sigs">${sigBox(c.Sup_Signature, 'Supervisor', c.Sup_Signed_By, '')}${sigBox(c.PQA_Signature, 'PQA', c.PQA_By, c.PQA_At)}</div></div></div></div>`;
+}
+
+function renderBatch(r) {
+  const b = S.batchBy[r.batchNo];
+  if (!b) { setTitle('Batch', r.batchNo); return `<div class="card empty"><div class="big">🔎</div>Batch ${esc(r.batchNo)} isn’t here. <a href="#/batches">See all batches</a></div>`; }
+  setTitle('Batch', b.Batch_No);
+  const i = info(b), can = S.D.can, st = i.stage;
+  const acts = [];
+  if (i.open && !i.hold && i.toRecord && can.stages[st.key]) acts.push(`<button class="btn btn-primary" data-act="record" data-b="${esc(b.Batch_No)}" data-s="${st.key}">${ico('plus')}Record ${esc(st.name)}</button>`);
+  if (i.open && !i.hold && i.waitingPqa && can.pqa) acts.push(`<button class="btn btn-ok" data-act="pqa-sign" data-b="${esc(b.Batch_No)}" data-s="${st.key}">${ico('pqa')}PQA sign ${esc(st.short)}</button>`);
+  if (i.open && can.pqa) acts.push(`<button class="btn ${i.hold ? 'btn-ok' : 'btn-soft-bad'}" data-act="hold" data-b="${esc(b.Batch_No)}">${ico('hold')}${i.hold ? 'Release hold' : 'PQA hold'}</button>`);
+  if (i.done && !b.FG_TxnID && b.FG_Code && can.pqa) acts.push(`<button class="btn btn-primary" data-act="post-fg" data-b="${esc(b.Batch_No)}">${ico('box')}Post to FG stock</button>`);
+  acts.push(`<button class="btn btn-ghost" data-act="pdf" data-b="${esc(b.Batch_No)}">${ico('pdf')}Batch card PDF</button>`);
+  acts.push(`<button class="btn btn-ghost" data-act="qr" data-b="${esc(b.Batch_No)}" title="QR label">${ico('qr')}</button>`);
+  if ((can.edit || (b.Created_By === S.D.me.username && i.step === 0)) && !i.void) acts.push(`<button class="btn btn-ghost" data-act="edit-batch" data-b="${esc(b.Batch_No)}" title="Edit batch">${ico('edit')}</button>`);
+  if (can.del && !i.void && !b.FG_TxnID) acts.push(`<button class="btn btn-ghost" data-act="void-batch" data-b="${esc(b.Batch_No)}" title="Delete batch">${ico('trash')}</button>`);
+  const stepper = stages().map((s2, k) => {
+    const c = cardOf(b.Batch_No, s2.key);
+    const cls = signed(c) ? 'done' : c ? (i.hold ? 'hold' : 'wait') : (k === i.idx && i.open ? (i.hold ? 'hold' : 'next') : '');
+    const sub = signed(c) ? 'Signed' : c ? 'PQA' : (k === i.idx && i.open ? (i.hold ? 'On hold' : 'Next') : '');
+    return `<div class="st ${cls}" data-act="jump" data-s="${s2.key}"><div class="st-c">${signed(c) ? ico('check') : s2.no}</div><small>${esc(s2.short)}</small><em>${sub}</em></div>`;
+  }).join('');
+  const cards = stages().map((s2, k) => {
+    const c = cardOf(b.Batch_No, s2.key);
+    if (c) return stageCardHtml(b, s2, k, c);
+    const isNext = k === i.idx && i.open && i.toRecord;
+    return `<div class="placeholder-card" id="card-${s2.key}"><div class="sn" style="${isNext ? 'background:' + STAGE_COLORS[k] + ';color:#fff' : ''}">${s2.no}</div><div style="flex:1"><b style="color:var(--ink)">${esc(s2.name)}</b><br><span style="font-size:12.5px">${isNext ? (i.hold ? 'On PQA hold — release it to go on.' : 'Next to record.') : 'Not recorded yet.'}</span></div>
+      ${isNext && !i.hold && can.stages[s2.key] ? `<button class="btn btn-primary btn-sm" data-act="record" data-b="${esc(b.Batch_No)}" data-s="${s2.key}">${ico('plus')}Record</button>` : ''}</div>`;
+  }).join('');
+  const holdNote = i.hold ? `<div class="note bad" style="margin:0 20px 16px">${ico('hold')} On PQA hold since ${dt(b.Hold_At)} by ${esc(nameOf(b.Hold_By))}: ${esc(b.Hold_Reason)}</div>` : '';
+  const fgNote = b.FG_TxnID ? `<div class="note" style="margin:0 20px 16px;background:var(--ok-soft);color:var(--ok)">${ico('box')} In FG stock: ${fmtNum(b.FG_Qty)} of ${esc(b.FG_Code)} · ${esc(b.FG_TxnID)} · ${dt(b.FG_Posted_At)}</div>`
+    : i.done && !b.FG_Code ? `<div class="note warn" style="margin:0 20px 16px">No Stock Management FG code for ${esc(b.Part_Code)}. Set “Stock FG code” on the product under Dropdowns → Products to post it.</div>` : '';
+  return `<div class="card"><div class="bhead"><div><div class="b-no">${esc(b.Batch_No)} ${statusBadge(b)}</div><div class="b-prod">${esc(b.Product_Name || b.Part_Code)}</div>
+      <div class="b-meta"><span>Part <b class="mono">${esc(b.Part_Code)}</b></span><span>Customer <b>${esc(b.Customer_Name || '—')}</b></span>${b.Rating ? `<span>Rating <b>${esc(b.Rating)}</b></span>` : ''}${b.Voltage ? `<span>Voltage <b>${esc(b.Voltage)}</b></span>` : ''}
+      <span>Started <b>${dt(b.Created_At)}</b> by ${esc(nameOf(b.Created_By))}</span></div>${b.Remarks ? `<div class="note">${esc(b.Remarks)}</div>` : ''}</div>
+      <div class="bactions">${acts.join('')}</div></div>
+    <div class="bstats"><div><small>Total</small><b>${fmtNum(b.Total_Qty)}</b></div><div><small>Good now</small><b style="color:var(--ok)">${fmtNum(b.Good_Qty)}</b></div><div><small>Rejected</small><b style="color:${num(b.Reject_Qty) ? 'var(--bad)' : 'inherit'}">${fmtNum(b.Reject_Qty || 0)}</b></div>
+      <div><small>Yield</small><b>${pct(num(b.Good_Qty), num(b.Total_Qty))}</b></div><div><small>${i.done ? 'Completed' : 'Last activity'}</small><b style="font-size:14px">${i.done ? dt(b.Done_At, false) : ago(b.Last_Activity)}</b></div></div>
+    <div style="border-top:1px solid var(--line-soft)"><div class="stepper">${stepper}</div></div>${holdNote}${fgNote}</div>
+    ${cards}
+    <div style="margin-top:16px;text-align:center"><button class="btn btn-ghost btn-sm" data-act="history" data-b="${esc(b.Batch_No)}">${ico('clock')}Show the full history</button><div id="historyBox"></div></div>`;
+}
+ACT.jump = (el) => { const c = document.getElementById('card-' + el.dataset.s); if (c) c.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+ACT.history = async (el) => {
+  const done = btnBusy(el, 'Loading…');
+  try {
+    const d = await api('getBatch', { batchNo: el.dataset.b });
+    const label = { CREATE_BATCH: 'Opened the batch', RECORD: 'Recorded', EDIT_CARD: 'Edited', PQA_SIGN: 'PQA signed', PQA_CLEAR: 'Took back the PQA sign-off', SEND_BACK: 'Sent back', VOID_CARD: 'Removed', HOLD: 'Put on PQA hold', RELEASE: 'Released the hold', EDIT_BATCH: 'Edited the batch', FG_POSTED: 'Posted to FG stock', VOID_BATCH: 'Deleted the batch' };
+    const rows = d.audit.slice().reverse().map(a => { let det = {}; try { det = JSON.parse(a.Detail || '{}'); } catch (e) {}
+      const st = stageByKey(a.Stage);
+      return `<div class="row" style="cursor:default"><div class="r-main"><b>${esc(nameOf(a.User))}</b> <span class="muted">${esc(label[a.Action] || a.Action)}${st ? ' ' + esc(st.name) : ''}</span>${det.reason ? `<small>“${esc(det.reason)}”</small>` : ''}</div><div class="r-side">${dt(a.Timestamp)}</div></div>`; }).join('');
+    $('#historyBox').innerHTML = `<div class="card" style="margin-top:12px;text-align:left"><div class="card-head"><h3>History</h3></div><div class="rows" style="margin-top:8px">${rows || '<div class="empty">No history recorded here (cards from the old app have none).</div>'}</div></div>`;
+    el.remove();
+  } catch (e) { toast(e.message, true); done(); }
+};
+
+/* =========================================================================
+   PQA QUEUE
+   ========================================================================= */
+function renderPqa() {
+  setTitle('Quality', 'PQA queue');
+  const open = openBatches();
+  const waiting = open.filter(b => info(b).waitingPqa && !info(b).hold).sort((a, b) => (a.Last_Activity || 0) - (b.Last_Activity || 0));
+  const hold = open.filter(b => info(b).hold);
+  const can = S.D.can;
+  const item = (b) => {
+    const i = info(b), c = cardOf(b.Batch_No, i.stage.key);
+    const key = c ? i.stage.fields.filter(f => c[f.key] !== '' && c[f.key] !== undefined && f.type !== 'auto').slice(0, 3).map(f => f.label + ' ' + fieldValue(f, c[f.key])).join(' · ') : '';
+    const pic = c && (c.Photo_1 || c.Photo_2);
+    return `<div class="row" style="cursor:default">${pic ? img(pic, 160, 'thumb', '') : batchThumb(b)}
+      <div class="r-main"><a href="#/batch/${esc(b.Batch_No)}/${i.stage.key}" style="color:inherit;text-decoration:none"><b class="mono">${esc(b.Batch_No)}</b></a> <span class="badge b-info">${esc(i.stage.name)}</span>
+        <small>${esc(b.Product_Name || b.Part_Code)} · ${c ? 'good ' + fmtNum(c.Good_Qty) + ' of ' + fmtNum(c.Total_Qty) : ''}${key ? ' · ' + esc(key) : ''}</small>
+        <small>Recorded by ${esc(nameOf(c && c.Recorded_By))} · ${ago(c && c.Recorded_At)}</small></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end"><a class="btn btn-ghost btn-sm" href="#/batch/${esc(b.Batch_No)}/${i.stage.key}">Review</a>${can.pqa ? `<button class="btn btn-ok btn-sm" data-act="pqa-sign" data-b="${esc(b.Batch_No)}" data-s="${i.stage.key}">${ico('pqa')}Sign</button>` : ''}</div></div>`;
+  };
+  const holdItem = (b) => `<div class="row" style="cursor:default">${batchThumb(b)}<div class="r-main"><a href="#/batch/${esc(b.Batch_No)}" style="color:inherit;text-decoration:none"><b class="mono">${esc(b.Batch_No)}</b></a> <span class="badge b-bad">On hold</span>
+      <small>${esc(b.Product_Name || b.Part_Code)} · at ${esc(info(b).stage.name)}</small><small>${esc(b.Hold_Reason)} — ${esc(nameOf(b.Hold_By))}, ${ago(b.Hold_At)}</small></div>
+      ${can.pqa ? `<button class="btn btn-ok btn-sm" data-act="hold" data-b="${esc(b.Batch_No)}">Release</button>` : ''}</div>`;
+  return `<div class="page-head"><div><p style="margin:0">Cards waiting for PQA sign-off, oldest first${can.pqa ? '' : ' (you can look; signing needs PQA access)'}.</p></div></div>
+    <div class="grid g-3"><div class="card"><div class="card-head"><div><h3>Waiting for sign-off</h3><p>${plural(waiting.length, 'card')}</p></div></div><div class="rows" style="margin-top:10px">${waiting.map(item).join('') || '<div class="empty"><div class="big">✓</div>Nothing waiting for PQA.</div>'}</div></div>
+    <div class="card"><div class="card-head"><div><h3>On PQA hold</h3><p>${plural(hold.length, 'batch', 'batches')}</p></div></div><div class="rows" style="margin-top:10px">${hold.map(holdItem).join('') || '<div class="empty">No batch is on hold.</div>'}</div></div></div>`;
+}
+
+/* =========================================================================
+   STAGES
+   ========================================================================= */
+function renderStagesIndex() {
+  setTitle('Production', 'Stages');
+  const c = navCounts();
+  return '<div class="grid g-2">' + stages().map((st, i) => `<a class="card card-pad" href="#/stage/${st.key}" style="display:flex;gap:14px;align-items:center;text-decoration:none;color:inherit">
+      <div class="sn" style="width:40px;height:40px;border-radius:11px;background:${STAGE_COLORS[i]};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700">${st.no}</div>
+      <div style="flex:1"><b>${esc(st.name)}</b><div class="muted" style="font-size:12.5px">${esc(st.departments || '')}</div></div><span class="badge b-muted">${c.stage[st.key] || 0} here</span></a>`).join('') + '</div>';
+}
+function renderStage(r) {
+  const st = stageByKey(r.key);
+  if (!st) return '<div class="card empty">Unknown stage.</div>';
+  const i = stages().indexOf(st);
+  setTitle('Stage ' + st.no, st.name);
+  const tab = S.view.stageTab[st.key] || 'record';
+  const open = openBatches().filter(b => info(b).idx === i);
+  const toRecord = open.filter(b => !info(b).waitingPqa);
+  const waiting = open.filter(b => info(b).waitingPqa);
+  const recorded = (S.D.cards[st.key] || []).slice().sort((a, b) => (b.Recorded_At || 0) - (a.Recorded_At || 0));
+  const can = S.D.can;
+  let body;
+  if (tab === 'record') {
+    body = toRecord.length ? '<div class="card"><div class="rows">' + toRecord.map(b => `<div class="row" style="cursor:default">${batchThumb(b)}<div class="r-main"><a href="#/batch/${esc(b.Batch_No)}" style="color:inherit;text-decoration:none"><b class="mono">${esc(b.Batch_No)}</b></a> ${info(b).hold ? '<span class="badge b-bad">On hold</span>' : ''}
+        <small>${esc(b.Product_Name || b.Part_Code)} · ${esc(b.Customer_Name || '')} · ${fmtNum(b.Good_Qty)} pieces</small><small>${i === 0 ? 'Opened ' + ago(b.Created_At) : 'Ready since ' + ago(b.Last_Activity)}</small></div>
+        ${can.stages[st.key] && !info(b).hold ? `<button class="btn btn-primary btn-sm" data-act="record" data-b="${esc(b.Batch_No)}" data-s="${st.key}">${ico('plus')}Record</button>` : ''}</div>`).join('') + '</div></div>'
+      : '<div class="card empty"><div class="big">✓</div>Nothing to record at ' + esc(st.name) + '.</div>';
+  } else if (tab === 'pqa') {
+    body = waiting.length ? '<div class="card"><div class="rows">' + waiting.map(b => { const c = cardOf(b.Batch_No, st.key); return `<div class="row" style="cursor:default">${c && c.Photo_1 ? img(c.Photo_1, 160, 'thumb') : batchThumb(b)}<div class="r-main"><b class="mono">${esc(b.Batch_No)}</b><small>${esc(b.Product_Name || b.Part_Code)} · good ${fmtNum(c && c.Good_Qty)}</small><small>Recorded by ${esc(nameOf(c && c.Recorded_By))} · ${ago(c && c.Recorded_At)}</small></div>
+        <a class="btn btn-ghost btn-sm" href="#/batch/${esc(b.Batch_No)}/${st.key}">Review</a>${can.pqa && !info(b).hold ? `<button class="btn btn-ok btn-sm" data-act="pqa-sign" data-b="${esc(b.Batch_No)}" data-s="${st.key}">Sign</button>` : ''}</div>`; }).join('') + '</div></div>'
+      : '<div class="card empty">Nothing waiting for PQA here.</div>';
+  } else {
+    const cols = st.fields.filter(f => f.type !== 'auto' || st.key === 'WIN').slice(0, 9);
+    body = recorded.length ? `<div class="card tbl-wrap"><table class="tbl"><thead><tr><th>Batch</th><th>Recorded</th><th class="num">Total</th>${st.rejects ? '<th class="num">Rej.</th>' : ''}<th class="num">Good</th><th>Operator</th>${cols.map(f => `<th>${esc(f.label)}</th>`).join('')}<th>PQA</th></tr></thead><tbody>` +
+      recorded.slice(0, 300).map(c => `<tr data-act="open-batch" data-b="${esc(c.Batch_No)}"><td><b class="mono">${esc(c.Batch_No)}</b></td><td>${dt(c.Recorded_At)}</td><td class="num">${fmtNum(c.Total_Qty)}</td>${st.rejects ? `<td class="num" style="${num(c.Reject_Qty) ? 'color:var(--bad)' : ''}">${fmtNum(c.Reject_Qty || 0)}</td>` : ''}<td class="num">${fmtNum(c.Good_Qty)}</td><td>${esc(c.Operator)}</td>
+        ${cols.map(f => `<td>${esc(fieldValue(f, c[f.key]))}</td>`).join('')}<td>${signed(c) ? '<span class="badge b-ok">' + esc(nameOf(c.PQA_By)) + '</span>' : '<span class="badge b-warn">waiting</span>'}</td></tr>`).join('') + '</tbody></table></div>'
+      : '<div class="card empty">No ' + esc(st.name) + ' cards yet.</div>';
+  }
+  return `<div class="page-head"><div style="display:flex;gap:12px;align-items:center"><div style="width:44px;height:44px;border-radius:12px;background:${STAGE_COLORS[i]};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px">${st.no}</div>
+      <div><p style="margin:0">Recorded by: ${esc(st.departments || '—')}${can.stages[st.key] ? '' : ' · <span class="badge b-muted">view only for you</span>'}</p></div></div></div>
+    <div class="toolbar"><div class="seg"><button class="${tab === 'record' ? 'on' : ''}" data-act="stab" data-k="${st.key}" data-v="record">To record <span class="faint">${toRecord.length}</span></button>
+      <button class="${tab === 'pqa' ? 'on' : ''}" data-act="stab" data-k="${st.key}" data-v="pqa">Waiting PQA <span class="faint">${waiting.length}</span></button>
+      <button class="${tab === 'done' ? 'on' : ''}" data-act="stab" data-k="${st.key}" data-v="done">Recorded <span class="faint">${recorded.length}</span></button></div></div>${body}`;
+}
+ACT.stab = (el) => { S.view.stageTab[el.dataset.k] = el.dataset.v; render(); };
+
+/* =========================================================================
+   MORE: APPS, ABOUT, FEEDBACK
+   ========================================================================= */
+const APP_GALLERY = [
+  ['Stock Management', 'RM, FG and Trade stock', 'https://calgas.github.io/Stock-Management/', '#b5652e', 'SM'],
+  ['Production Tracker', 'Handovers and work in progress', 'https://calgas.github.io/Production-Tracker/', '#3e6e97', 'PT'],
+  ['CALGAS Workforce', 'People and attendance', 'https://calgas.github.io/Workforce/', '#3f9e73', 'WF'],
+  ['Calgas Tasks', 'Tasks and follow-ups', 'https://calgas.github.io/Tasks/', '#6b5fa8', 'TK'],
+  ['calgascapacitors.com', 'Company website', 'https://calgascapacitors.com/', '#1c2024', 'CC']
+];
+function renderApps() {
+  setTitle('More', 'Apps');
+  return '<div class="apps">' + APP_GALLERY.map(a => `<a class="card app-tile" href="${a[2]}" target="_blank" rel="noopener"><div class="ai" style="background:${a[3]}">${a[4]}</div><div><b>${esc(a[0])}</b><small>${esc(a[1])}</small></div></a>`).join('') + '</div>';
+}
+function renderMore() {
+  setTitle('More', 'More');
+  const can = S.D.can;
+  const tile = (hash, icon, title, sub) => `<a class="card app-tile" href="${hash}"><div class="ai" style="background:var(--copper-soft);color:var(--copper)">${ico(icon)}</div><div><b>${esc(title)}</b><small>${esc(sub)}</small></div></a>`;
+  return `<div class="apps">${can.lists ? tile('#/dropdowns', 'list', 'Dropdowns', 'Lists, films and products') : ''}${tile('#/apps', 'more', 'Apps', 'Other CALGAS apps')}${tile('#/feedback', 'pen', 'Feedback', 'Ideas, or report a bug')}${tile('#/about', 'alert', 'About', 'Version and your account')}</div>
+    <div class="card card-pad" style="margin-top:16px;display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:center;gap:10px"><b style="flex:1">Zoom</b><div class="zoom-ctl" role="group"><button data-zoom="-1">−</button><button data-zoom="0" class="zl">${Math.round(currentZoom() * 100)}%</button><button data-zoom="1">+</button></div></div>
+      <div style="display:flex;align-items:center;gap:10px"><b style="flex:1">Refresh the figures</b><button class="btn btn-ghost btn-sm" data-act="refresh">${ico('refresh')}Refresh</button></div>
+      <div style="display:flex;align-items:center;gap:10px"><b style="flex:1">${esc(S.D.me.name)}<div class="muted" style="font-weight:400;font-size:12.5px">${esc([S.D.me.role, S.D.me.department].filter(Boolean).join(' · '))}</div></b><button class="btn btn-soft-bad btn-sm" data-act="sign-out">${ico('out')}Sign out</button></div></div>`;
+}
+ACT.refresh = () => refresh(false);
+ACT['sign-out'] = () => signOut();
+function renderAbout() {
+  setTitle('More', 'About');
+  const me = S.D.me, can = S.D.can;
+  const yes = (v) => v ? '<span class="badge b-ok">Yes</span>' : '<span class="badge b-muted">No</span>';
+  return `<div class="grid g-2"><div class="card card-pad"><h3 style="margin-top:0">Batch Card Tracker</h3>
+      <p class="muted">The digital batch card for CALGAS capacitors. Every batch moves through eight stages — Winding, Spray, Heat Stabilizing, Short Clearing, Welding &amp; Soldering, Pouring &amp; Seaming, Testing &amp; Packing and Final Audit. Each stage is recorded with its readings, photos and the Production Supervisor’s signature, then signed off by PQA before the next stage can start. A batch that passes Final Audit is posted into Stock Management as finished goods.</p>
+      <p class="muted">Photos are shrunk on the phone before they upload and are shown through Google’s image servers, so cards open fast; what you have seen stays on this device.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><span class="badge b-copper">App ${APP_VERSION}</span><span class="badge b-muted">Server ${esc(S.D.version)}</span><span class="badge b-muted">Photos: ${mediaMode() === 'public' ? 'fast path' : 'through the app'}</span></div></div>
+    <div class="card card-pad"><h3 style="margin-top:0">Your access</h3><div class="rows">
+      <div class="row" style="cursor:default;padding:8px 0"><div class="r-main">Signed in as <b>${esc(me.name)}</b> (${esc(me.username)})</div><div>${esc(me.role)} · ${esc(me.department)}</div></div>
+      <div class="row" style="cursor:default;padding:8px 0"><div class="r-main">Create batches</div>${yes(can.create)}</div>
+      <div class="row" style="cursor:default;padding:8px 0"><div class="r-main">Stages you record</div><div>${stages().filter(s => can.stages[s.key]).map(s => esc(s.short)).join(', ') || '<span class="badge b-muted">None</span>'}</div></div>
+      <div class="row" style="cursor:default;padding:8px 0"><div class="r-main">PQA sign-off and hold</div>${yes(can.pqa)}</div>
+      <div class="row" style="cursor:default;padding:8px 0"><div class="r-main">Edit signed cards</div>${yes(can.edit)}</div>
+      <div class="row" style="cursor:default;padding:8px 0"><div class="r-main">Delete cards and batches</div>${yes(can.del)}</div>
+      <div class="row" style="cursor:default;padding:8px 0"><div class="r-main">Manage dropdowns</div>${yes(can.lists)}</div></div>
+      <p class="hint">Access is set in Stock Management → Team &amp; Access.</p></div></div>
+    <div style="text-align:center;margin-top:28px" class="faint">Designed &amp; developed by <b style="color:var(--ink-soft)">Vanga Prasanna Kumar</b> · CALGAS CAPACITORS · © ${new Date().getFullYear()}</div>`;
+}
+function renderFeedback() {
+  setTitle('More', 'Feedback');
+  return `<div class="card card-pad" style="max-width:640px"><div class="seg" style="margin-bottom:14px"><button class="on" data-act="fbkind" data-v="feedback">Feedback</button><button data-act="fbkind" data-v="bug">Report a bug</button></div>
+    <div style="display:flex;flex-direction:column;gap:14px"><div class="field"><label>Subject</label><input id="fbSubject" maxlength="200"></div>
+    <div class="field"><label>Message</label><textarea id="fbMessage" rows="6" maxlength="4000" placeholder="What would make the batch cards better?"></textarea></div>
+    <div class="form-error" id="fbErr"></div><div><button class="btn btn-primary" data-act="fbsend">Send</button></div></div></div>`;
+}
+ACT.fbkind = (el) => { $$('[data-act=fbkind]').forEach(b => b.classList.toggle('on', b === el)); $('#fbMessage').placeholder = el.dataset.v === 'bug' ? 'What happened, and what did you expect?' : 'What would make the batch cards better?'; };
+ACT.fbsend = async (el) => {
+  const kind = ($('[data-act=fbkind].on') || {}).dataset.v || 'feedback';
+  const done = btnBusy(el, 'Sending…');
+  try {
+    await api('sendFeedback', { kind, subject: $('#fbSubject').value, message: $('#fbMessage').value, page: S._lastPage, appVersion: APP_VERSION, device: navigator.userAgent + ' · ' + innerWidth + '×' + innerHeight });
+    toast('Thank you — sent.', 'ok'); $('#fbSubject').value = ''; $('#fbMessage').value = ''; $('#fbErr').textContent = '';
+  } catch (e) { $('#fbErr').textContent = e.message; } finally { done(); }
+};
+
+
+/* =========================================================================
+   SAVING: apply what the server returned, without a full reload
+   ========================================================================= */
+function applyResult(d) {
+  if (!d) return;
+  if (d.batch) {
+    const i = S.D.batches.findIndex(b => b.Batch_No === d.batch.Batch_No);
+    if (i > -1) S.D.batches[i] = d.batch; else S.D.batches.push(d.batch);
+  }
+  if (d.card) {
+    const key = Object.keys(S.D.cards).find(k => (S.D.cards[k] || []).some(c => c.Row_ID === d.card.Row_ID)) || d._stage;
+    if (key) {
+      const list = S.D.cards[key] = (S.D.cards[key] || []).filter(c => c.Row_ID !== d.card.Row_ID);
+      if (d.card.Status !== 'Void') list.push(d.card);
+    }
+  }
+  if (d.lists) S.D.lists = d.lists;
+  if (d.films) S.D.films = d.films;
+  if (d.products) S.D.products = d.products;
+  applyData(S.D, 'server');
+  render();
+}
+function flushAlerts() { api('sendPendingAlerts', {}).catch(() => {}); }
+
+/* =========================================================================
+   PHOTOS AND SIGNATURES
+   ========================================================================= */
+async function compressImage(file, maxSide, quality) {
+  maxSide = maxSide || 1600; quality = quality || 0.82;
+  let src;
+  try { src = await createImageBitmap(file, { imageOrientation: 'from-image' }); }
+  catch (e) { src = await new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = URL.createObjectURL(file); }); }
+  const w = src.width, h = src.height, k = Math.min(1, maxSide / Math.max(w, h));
+  const cv = document.createElement('canvas');
+  cv.width = Math.round(w * k); cv.height = Math.round(h * k);
+  cv.getContext('2d').drawImage(src, 0, 0, cv.width, cv.height);
+  const blob = await new Promise(r => cv.toBlob(r, 'image/jpeg', quality));
+  return blob;
+}
+function blobToBase64(blob) { return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.onerror = rej; r.readAsDataURL(blob); }); }
+async function uploadBlob(blob, meta) {
+  const d = await api('uploadMedia', Object.assign({ data: await blobToBase64(blob), mime: blob.type }, meta), { retry: true });
+  S.localMedia[d.fileId] = URL.createObjectURL(blob);
+  return d.fileId;
+}
+
+// A signature pad: pointer drawing, trimmed PNG out.
+function SignaturePad(wrap) {
+  const cv = $('canvas', wrap), ctx = cv.getContext('2d');
+  let drawing = false, empty = true, last = null;
+  function size() {
+    const r = cv.getBoundingClientRect(), dpr = Math.max(1, window.devicePixelRatio || 1);
+    const z = currentZoom();
+    cv.width = Math.round(r.width / z * dpr * z); cv.height = Math.round(r.height / z * dpr * z);
+    ctx.setTransform(cv.width / r.width, 0, 0, cv.height / r.height, 0, 0);
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#1c2024'; ctx.lineWidth = 2.4;
+    empty = true; wrap.classList.remove('done');
+  }
+  function pos(e) { const r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+  cv.addEventListener('pointerdown', e => { e.preventDefault(); cv.setPointerCapture(e.pointerId); drawing = true; last = pos(e); ctx.beginPath(); ctx.arc(last.x, last.y, 1.1, 0, Math.PI * 2); ctx.fillStyle = '#1c2024'; ctx.fill(); });
+  cv.addEventListener('pointermove', e => {
+    if (!drawing) return;
+    const p = pos(e);
+    ctx.beginPath(); ctx.moveTo(last.x, last.y);
+    const mid = { x: (last.x + p.x) / 2, y: (last.y + p.y) / 2 };
+    ctx.quadraticCurveTo(last.x, last.y, mid.x, mid.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+    last = p; if (empty) { empty = false; wrap.classList.add('done'); }
+  });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(t => cv.addEventListener(t, () => { drawing = false; }));
+  $('.sp-clear', wrap).addEventListener('click', size);
+  setTimeout(size, 30);
+  return {
+    isEmpty: () => empty,
+    clear: size,
+    // Trimmed to the ink, at most 600 px wide.
+    toBlob: () => new Promise(res => {
+      const d = ctx.getImageData(0, 0, cv.width, cv.height).data;
+      let x0 = cv.width, y0 = cv.height, x1 = 0, y1 = 0;
+      for (let y = 0; y < cv.height; y += 2) for (let x = 0; x < cv.width; x += 2) if (d[(y * cv.width + x) * 4 + 3] > 10) { if (x < x0) x0 = x; if (y < y0) y0 = y; if (x > x1) x1 = x; if (y > y1) y1 = y; }
+      const pad = 12; x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad); x1 = Math.min(cv.width, x1 + pad); y1 = Math.min(cv.height, y1 + pad);
+      const w = Math.max(1, x1 - x0), h = Math.max(1, y1 - y0), k = Math.min(1, 600 / w);
+      const out = document.createElement('canvas'); out.width = Math.round(w * k); out.height = Math.round(h * k);
+      out.getContext('2d').drawImage(cv, x0, y0, w, h, 0, 0, out.width, out.height);
+      out.toBlob(res, 'image/png');
+    })
+  };
+}
+function sigPadHtml(id, hint) {
+  return `<div class="sigpad" id="${id}"><canvas></canvas><div class="sp-line"></div><div class="sp-hint">${esc(hint || 'Sign here')}</div><button type="button" class="btn btn-ghost btn-sm sp-clear">Clear</button></div>`;
+}
+
+/* =========================================================================
+   NEW / EDIT BATCH
+   ========================================================================= */
+function openBatchForm(batch) {
+  const can = S.D.can, edit = !!batch;
+  const products = S.D.products.slice().sort((a, b) => String(a.Part_Code).localeCompare(String(b.Part_Code)));
+  const customers = S.D.lists.Customers || [];
+  const m = openModal(modalHead(edit ? 'Edit batch' : 'New batch', edit ? batch.Batch_No : 'Open a new batch card', edit ? '' : 'The batch number is given when you save.') +
+    `<div class="modal-body"><div class="form-grid">
+      <div class="field full"><label>Part code <span class="req">*</span></label><input id="bfPart" list="bfParts" autocomplete="off" value="${esc(edit ? batch.Part_Code : '')}" placeholder="Type to search products">
+        <datalist id="bfParts">${products.map(p => `<option value="${esc(p.Part_Code)}">${esc(p.Product_Name || '')}</option>`).join('')}</datalist><div class="hint" id="bfProd"></div></div>
+      <div class="field"><label>Customer</label><select id="bfCust"><option value="">—</option>${customers.map(c => `<option ${edit && batch.Customer_Name === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></div>
+      <div class="field"><label>Total quantity <span class="req">*</span></label><input id="bfQty" type="number" inputmode="numeric" min="1" step="1" value="${esc(edit ? batch.Total_Qty : '')}"></div>
+      ${can.backdate ? `<div class="field"><label>Batch date</label><input id="bfDate" type="datetime-local"><div class="hint">Leave empty for now. Only for paperwork entered late.</div></div>` : ''}
+      <div class="field full"><label>Remarks</label><textarea id="bfRemarks" maxlength="1000">${esc(edit ? batch.Remarks : '')}</textarea></div>
+      ${edit && num(batch.Step) > 0 ? '<div class="field full"><label>Why the change <span class="req">*</span></label><input id="bfReason" maxlength="300"></div>' : ''}
+    </div><div class="form-error" id="bfErr"></div></div>
+    <div class="modal-foot"><button class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-primary" id="bfSave">${edit ? 'Save changes' : 'Create batch'}</button></div>`);
+  const showProd = () => { const p = products.find(x => String(x.Part_Code).toUpperCase() === $('#bfPart', m.el).value.trim().toUpperCase()); $('#bfProd', m.el).textContent = p ? [p.Product_Name, p.Rating, p.Voltage].filter(Boolean).join(' · ') : ($('#bfPart', m.el).value ? 'Not in Products yet.' : ''); };
+  $('#bfPart', m.el).addEventListener('input', showProd); showProd();
+  setTimeout(() => $('#bfPart', m.el).focus(), 40);
+  const txn = uuid();
+  $('#bfSave', m.el).addEventListener('click', async (e) => {
+    const err = $('#bfErr', m.el); err.textContent = '';
+    const p = { partCode: $('#bfPart', m.el).value.trim(), customer: $('#bfCust', m.el).value, totalQty: $('#bfQty', m.el).value, remarks: $('#bfRemarks', m.el).value };
+    if ($('#bfDate', m.el) && $('#bfDate', m.el).value) p.createdAt = new Date($('#bfDate', m.el).value).toISOString();
+    const done = btnBusy(e.currentTarget);
+    try {
+      let d;
+      if (edit) { p.batchNo = batch.Batch_No; if ($('#bfReason', m.el)) p.reason = $('#bfReason', m.el).value; d = await api('updateBatch', p); }
+      else { p.clientTxnId = txn; d = await api('createBatch', p); }
+      m.close(); applyResult(d);
+      toast(edit ? 'Saved.' : d.batch.Batch_No + ' created.', 'ok');
+      if (!edit) { go('#/batch/' + d.batch.Batch_No); if (S.D.can.stages.WIN && await confirmBox('Record Winding for ' + d.batch.Batch_No + ' now?', { title: 'Batch created', eyebrow: d.batch.Batch_No, ok: 'Record Winding' })) openCardForm(d.batch.Batch_No, 'WIN'); }
+    } catch (x) { err.textContent = x.message; } finally { done(); }
+  });
+}
+ACT['edit-batch'] = (el) => openBatchForm(S.batchBy[el.dataset.b]);
+ACT['void-batch'] = async (el) => {
+  const r = await reasonBox('Delete ' + el.dataset.b + '?', 'Why is this batch being deleted?', { danger: true, ok: 'Delete batch', sub: 'It stays in the records, marked deleted.' });
+  if (r === null) return;
+  try { applyResult(await api('voidBatch', { batchNo: el.dataset.b, reason: r })); toast(el.dataset.b + ' deleted.'); go('#/batches'); } catch (e) { toast(e.message, true); }
+};
+
+/* =========================================================================
+   RECORD / EDIT A STAGE CARD
+   ========================================================================= */
+function draftKey(b, s) { return 'bct_draft:' + S.session.username + ':' + b + ':' + s; }
+function fieldInput(f, value, b, existing) {
+  const id = 'cf_' + f.key;
+  const v = value === undefined || value === null ? '' : value;
+  const lab = `<label for="${id}">${esc(f.label)}${f.required ? ' <span class="req">*</span>' : ''}</label>`;
+  if (f.type === 'auto') return `<div class="field">${lab.replace('<label', '<label data-auto="1"')}<div class="auto" id="${id}">${esc(v) || '—'}</div></div>`;
+  if (f.type === 'film') {
+    return `<div class="field">${lab}<select id="${id}" data-key="${f.key}"><option value="">—</option>${S.D.films.map(x => `<option ${String(x.Film) === String(v) ? 'selected' : ''}>${esc(x.Film)}</option>`).join('')}</select></div>`;
+  }
+  if (f.type === 'list') {
+    const opts = (S.D.lists[f.list] || []).slice();
+    if (v && opts.indexOf(String(v)) === -1) opts.unshift(String(v));
+    return `<div class="field">${lab}<input id="${id}" data-key="${f.key}" list="${id}_l" value="${esc(v)}" autocomplete="off"><datalist id="${id}_l">${opts.map(o => `<option value="${esc(o)}">`).join('')}</datalist></div>`;
+  }
+  if (f.type === 'enum') {
+    return `<div class="field">${lab}<div class="chips" data-key="${f.key}" data-enum="1">${f.options.map(o => `<button type="button" class="chip ${o === v ? 'on' : ''}" data-v="${esc(o)}">${esc(o)}</button>`).join('')}</div></div>`;
+  }
+  if (f.type === 'datetime') {
+    const iso = v ? new Date(new Date(v).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : '';
+    return `<div class="field">${lab}<input id="${id}" data-key="${f.key}" type="datetime-local" value="${iso}"></div>`;
+  }
+  if (f.type === 'int' || f.type === 'dec') {
+    return `<div class="field">${lab}<div class="unit-wrap"><input id="${id}" data-key="${f.key}" type="number" inputmode="decimal" step="${f.type === 'int' ? '1' : 'any'}" value="${esc(v)}">${f.unit ? `<span class="unit">${esc(f.unit)}</span>` : ''}</div></div>`;
+  }
+  return `<div class="field">${lab}<input id="${id}" data-key="${f.key}" value="${esc(v)}" maxlength="200"></div>`;
+}
+
+async function openCardForm(batchNo, stageKey, editing) {
+  const b = S.batchBy[batchNo], st = stageByKey(stageKey);
+  if (!b || !st) return;
+  const existing = editing ? cardOf(batchNo, stageKey) : null;
+  const prevSt = stages()[st.no - 2];
+  const prev = prevSt ? cardOf(batchNo, prevSt.key) : null;
+  const product = S.D.products.find(p => String(p.Part_Code).toUpperCase() === String(b.Part_Code).toUpperCase()) || {};
+  const win = cardOf(batchNo, 'WIN') || {};
+  const draft = !editing && load(draftKey(batchNo, stageKey), true);
+  const val = (f) => {
+    if (existing) return existing[f.key];
+    if (draft && draft.fields && draft.fields[f.key] !== undefined) return draft.fields[f.key];
+    if (f.from === 'product') return product[f.key] !== undefined ? product[f.key] : '';
+    if (f.from === 'winding') return win[f.key] || '';
+    return '';
+  };
+  const total = existing ? existing.Total_Qty : draft && draft.totalQty !== undefined ? draft.totalQty : prev ? num(prev.Good_Qty !== '' ? prev.Good_Qty : prev.Total_Qty) : num(b.Total_Qty);
+  const media = Object.assign({}, existing ? { Photo_1: existing.Photo_1, Photo_2: existing.Photo_2 } : {}, draft && draft.media || {});
+  const reasonsList = S.D.lists['Reject Reasons'] || [];
+  const curReasons = reasonSplit(existing ? existing.Reject_Reason : draft && draft.rejectReason);
+  const opList = S.D.lists[st.operatorList] || [];
+  const operator = existing ? existing.Operator : draft && draft.operator || '';
+  const supName = existing ? existing.Sup_Signed_By : draft && draft.supName || '';
+  const signedCard = existing && signed(existing);
+  const m = openModal(modalHead(editing ? 'Edit · Stage ' + st.no : 'Record · Stage ' + st.no, st.name + ' — ' + b.Batch_No,
+      esc(b.Product_Name || b.Part_Code) + ' · ' + esc(b.Customer_Name || '') + (prev ? ' · ' + fmtNum(prev.Good_Qty) + ' good from ' + esc(prevSt.name) : '')) +
+    `<div class="modal-body">${draft ? '<div class="note">Your unsaved entry was kept on this phone and is filled in below.</div>' : ''}
+      <div class="fsec">Quantity</div>
+      <div class="qty-row"><div class="field"><label>Total <span class="req">*</span></label><input id="cfTotal" type="number" inputmode="numeric" min="1" step="1" value="${esc(total)}"></div>
+        ${st.rejects ? `<div class="field"><label>Rejected</label><input id="cfReject" type="number" inputmode="numeric" min="0" step="1" value="${esc(existing ? existing.Reject_Qty : draft && draft.rejectQty || 0)}"></div>` : '<div></div>'}
+        <div class="field"><label>Good</label><div class="good-box" id="cfGood">0</div></div></div>
+      ${st.rejects ? `<div class="field hidden" id="cfReasonWrap"><label>Reject reason <span class="req">*</span></label><div class="chips" id="cfReasons">${reasonsList.map(r => `<button type="button" class="chip ${curReasons.indexOf(r) > -1 ? 'on' : ''}" data-v="${esc(r)}">${esc(r)}</button>`).join('')}</div>
+        <input id="cfReasonOther" placeholder="Other reason" value="${esc(curReasons.filter(r => reasonsList.indexOf(r) === -1).join('; '))}" style="margin-top:6px"></div>` : ''}
+      <div class="fsec">Readings</div>
+      <div class="form-grid">${st.fields.map(f => fieldInput(f, val(f), b, existing)).join('')}
+        <div class="field"><label>Operator <span class="req">*</span></label><input id="cfOperator" list="cfOps" value="${esc(operator)}" autocomplete="off"><datalist id="cfOps">${opList.map(o => `<option value="${esc(o)}">`).join('')}</datalist></div></div>
+      <div class="fsec">Photos</div>
+      <div class="capture">${st.photos.map(p => `<div class="cap" data-photo="${p.key}" tabindex="0">${ico('cam')}<span>${esc(p.label)}</span></div>`).join('')}</div>
+      <div class="fsec">Production Supervisor</div>
+      ${existing && existing.Sup_Signature ? `<div class="note">Signed${existing.Sup_Signed_By ? ' by ' + esc(existing.Sup_Signed_By) : ''}. <button type="button" class="btn btn-ghost btn-sm" id="cfResign">Sign again</button></div>` : ''}
+      <div id="cfSigWrap" class="${existing && existing.Sup_Signature ? 'hidden' : ''}"><div class="field" style="margin-bottom:10px"><label>Supervisor’s name</label><input id="cfSupName" value="${esc(supName)}" maxlength="80"></div>${sigPadHtml('cfSig', 'Production Supervisor signs here')}</div>
+      <div class="field"><label>Remarks</label><textarea id="cfRemarks" maxlength="1000">${esc(existing ? existing.Remarks : draft && draft.remarks || '')}</textarea></div>
+      ${signedCard ? '<div class="field"><label>Why change a PQA-signed card <span class="req">*</span></label><input id="cfWhy" maxlength="300"></div>' : ''}
+      <div class="form-error" id="cfErr"></div></div>
+    <div class="modal-foot"><span class="hint grow" id="cfUploads"></span><button class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-primary btn-lg" id="cfSave">${editing ? 'Save changes' : 'Save ' + esc(st.short)}</button></div>`,
+    { wide: true, sticky: true });
+  const el = m.el;
+  const pad = SignaturePad($('#cfSig', el));
+  const uploads = {};   // key -> promise of fileId
+  const cur = Object.assign({}, media);
+
+  const good = () => { const t = num($('#cfTotal', el).value), r = st.rejects ? num($('#cfReject', el).value) : 0; $('#cfGood', el).textContent = fmtNum(Math.max(0, t - r)); if (st.rejects) $('#cfReasonWrap', el).classList.toggle('hidden', !(r > 0)); };
+  ['#cfTotal', '#cfReject'].forEach(s => { const i = $(s, el); if (i) i.addEventListener('input', good); });
+  good();
+  $$('[data-enum] .chip', el).forEach(c => c.addEventListener('click', () => { $$('.chip', c.parentNode).forEach(x => x.classList.remove('on')); c.classList.add('on'); }));
+  $$('#cfReasons .chip', el).forEach(c => c.addEventListener('click', () => c.classList.toggle('on')));
+  const filmSel = $('#cf_Film', el);
+  if (filmSel) filmSel.addEventListener('change', () => {
+    const f = S.D.films.find(x => String(x.Film) === filmSel.value) || {};
+    st.fields.filter(x => x.type === 'auto').forEach(x => { const t = $('#cf_' + x.key, el); if (t) t.textContent = f[x.auto] || '—'; });
+  });
+  if (filmSel && !existing) filmSel.dispatchEvent(new Event('change'));
+  if ($('#cfResign', el)) $('#cfResign', el).addEventListener('click', () => { $('#cfSigWrap', el).classList.remove('hidden'); $('#cfResign', el).parentNode.remove(); setTimeout(pad.clear, 30); });
+
+  function paintCap(key) {
+    const cap = $(`[data-photo="${key}"]`, el), p = st.photos.find(x => x.key === key);
+    const id = cur[key];
+    let inner = `${ico('cam')}<span>${esc(p.label)}</span>`;
+    if (cap._preview || (id && String(id).indexOf('missing:') !== 0)) {
+      const src = cap._preview || mediaSrc(id, 400);
+      inner = `<img ${src ? `src="${esc(src)}"` : ''} ${!cap._preview && id ? `data-mid="${esc(id)}" data-w="400"` : ''} alt=""><button type="button" class="cap-x" data-x="${key}" aria-label="Remove">${ico('x')}</button>` +
+        `<span class="cap-state">${cap._state === 'up' ? '<span class="badge b-warn"><span class="spin" style="width:10px;height:10px"></span> uploading</span>' : cap._state === 'fail' ? '<span class="badge b-bad">upload failed — tap to retry</span>' : '<span class="badge b-ok">' + ico('check') + ' saved</span>'}</span>`;
+    }
+    cap.innerHTML = inner;
+    hydrateProxyImages(cap);
+    const x = $('[data-x]', cap);
+    if (x) x.addEventListener('click', ev => { ev.stopPropagation(); cur[key] = ''; cap._preview = null; cap._state = null; delete uploads[key]; paintCap(key); saveDraft(); });
+  }
+  function updateUploads() {
+    const n = st.photos.filter(p => { const c = $(`[data-photo="${p.key}"]`, el); return c && c._state === 'up'; }).length;
+    $('#cfUploads', el).textContent = n ? 'Uploading ' + plural(n, 'photo') + '…' : '';
+  }
+  st.photos.forEach(p => {
+    const cap = $(`[data-photo="${p.key}"]`, el);
+    paintCap(p.key);
+    cap.addEventListener('click', () => {
+      const fi = $('#fileInput');
+      fi.value = '';
+      fi.onchange = async () => {
+        const file = fi.files && fi.files[0];
+        if (!file) return;
+        cap._state = 'up'; cap._preview = URL.createObjectURL(file); paintCap(p.key); updateUploads();
+        const job = (async () => {
+          const blob = await compressImage(file);
+          cap._preview = URL.createObjectURL(blob); paintCap(p.key);
+          const id = await uploadBlob(blob, { batchNo, stage: stageKey, kind: p.key });
+          cur[p.key] = id; return id;
+        })();
+        uploads[p.key] = job;
+        job.then(() => { cap._state = 'ok'; paintCap(p.key); updateUploads(); saveDraft(); })
+           .catch(e => { cap._state = 'fail'; paintCap(p.key); updateUploads(); toast('Photo upload: ' + e.message, true); });
+      };
+      fi.click();
+    });
+  });
+
+  function collect() {
+    const fields = {};
+    st.fields.forEach(f => {
+      if (f.type === 'auto') return;
+      if (f.type === 'enum') { const on = $(`[data-key="${f.key}"] .chip.on`, el); fields[f.key] = on ? on.dataset.v : ''; return; }
+      const i = $('#cf_' + f.key, el); if (!i) return;
+      fields[f.key] = f.type === 'datetime' ? (i.value ? new Date(i.value).toISOString() : '') : i.value.trim();
+    });
+    const reasons = st.rejects ? $$('#cfReasons .chip.on', el).map(c => c.dataset.v).concat(reasonSplit($('#cfReasonOther', el).value)) : [];
+    return { fields, totalQty: $('#cfTotal', el).value, rejectQty: st.rejects ? $('#cfReject', el).value : 0, rejectReason: reasons.join('; '),
+             operator: $('#cfOperator', el).value.trim(), remarks: $('#cfRemarks', el).value, supName: $('#cfSupName', el) ? $('#cfSupName', el).value.trim() : '' };
+  }
+  const saveDraft = debounce(() => { if (editing) return; const c = collect(); c.media = cur; store(draftKey(batchNo, stageKey), c); }, 400);
+  el.addEventListener('input', saveDraft); el.addEventListener('click', saveDraft);
+  const txn = uuid();
+  $('#cfSave', el).addEventListener('click', async (e) => {
+    const err = $('#cfErr', el); err.textContent = '';
+    const c = collect();
+    const missing = st.fields.filter(f => f.required && f.type !== 'auto' && !c.fields[f.key]).map(f => f.label);
+    if (missing.length) { err.textContent = 'Fill in: ' + missing.join(', ') + '.'; return; }
+    if (!c.operator) { err.textContent = 'Enter the operator.'; return; }
+    if (st.rejects && num(c.rejectQty) > 0 && !c.rejectReason) { err.textContent = 'Choose the reject reason.'; return; }
+    const needSig = !(existing && existing.Sup_Signature && $('#cfSigWrap', el).classList.contains('hidden'));
+    if (needSig && pad.isEmpty()) { err.textContent = 'The Production Supervisor must sign.'; return; }
+    if (signedCard && !$('#cfWhy', el).value.trim()) { err.textContent = 'Say why a signed card is being changed.'; return; }
+    const done = btnBusy(e.currentTarget, Object.keys(uploads).length ? 'Finishing uploads…' : 'Saving…');
+    try {
+      await Promise.all(Object.values(uploads));
+      const mediaOut = {};
+      st.photos.forEach(p => { mediaOut[p.key] = cur[p.key] || ''; });
+      if (needSig) mediaOut.Sup_Signature = await uploadBlob(await pad.toBlob(), { batchNo, stage: stageKey, kind: 'Sup_Signature' });
+      const params = Object.assign({ batchNo, stage: stageKey, media: mediaOut, clientTxnId: editing ? undefined : txn }, c);
+      if (editing) { params.rowId = existing.Row_ID; if (signedCard) params.reason = $('#cfWhy', el).value.trim(); }
+      const d = await api('saveCard', params);
+      d._stage = stageKey;
+      store(draftKey(batchNo, stageKey));
+      m.close(); applyResult(d); flushAlerts();
+      toast(editing ? 'Saved.' : st.name + ' recorded for ' + batchNo + '. PQA has been told.', 'ok');
+      if (S.route.page !== 'batch') go('#/batch/' + batchNo + '/' + stageKey);
+    } catch (x) { err.textContent = x.message; } finally { done(); }
+  });
+}
+ACT.record = (el) => openCardForm(el.dataset.b, el.dataset.s, false);
+ACT['edit-card'] = (el) => openCardForm(el.dataset.b, el.dataset.s, true);
+
+/* =========================================================================
+   PQA: SIGN, HOLD, SEND BACK
+   ========================================================================= */
+function openPqaSign(batchNo, stageKey) {
+  const b = S.batchBy[batchNo], st = stageByKey(stageKey), c = cardOf(batchNo, stageKey);
+  if (!b || !c) return;
+  const i = stages().indexOf(st);
+  const readings = `<div class="readings">${reading('Total', fmtNum(c.Total_Qty), 'q')}${st.rejects ? reading('Rejected', fmtNum(c.Reject_Qty || 0), 'q ' + (num(c.Reject_Qty) ? 'bad' : '')) : ''}${reading('Good', fmtNum(c.Good_Qty), 'q good')}${reading('Operator', c.Operator)}
+      ${st.fields.map(f => reading(f.label, fieldValue(f, c[f.key]))).join('')}${c.Reject_Reason ? reading('Reject reason', c.Reject_Reason) : ''}</div>`;
+  const photos = st.photos.filter(p => c[p.key] && String(c[p.key]).indexOf('missing:') !== 0).map(p => `<div class="photo" data-act="lightbox" data-mid="${esc(c[p.key])}" data-cap="${esc(p.label)}">${img(c[p.key], 520)}<span>${esc(p.label)}</span></div>`).join('');
+  const m = openModal(modalHead('PQA sign-off · Stage ' + st.no, st.name + ' — ' + batchNo, esc(b.Product_Name || b.Part_Code) + ' · recorded by ' + esc(nameOf(c.Recorded_By)) + ' ' + ago(c.Recorded_At)) +
+    `<div class="modal-body">${readings}${c.Remarks ? `<div class="note">${esc(c.Remarks)}</div>` : ''}
+      ${photos || c.Sup_Signature ? `<div class="photos" style="grid-template-columns:repeat(${Math.min(3, st.photos.length + 1)},1fr)">${photos}${c.Sup_Signature ? `<div class="sig" style="aspect-ratio:auto">${img(c.Sup_Signature, 360)}<small>Supervisor${c.Sup_Signed_By ? ' · ' + esc(c.Sup_Signed_By) : ''}</small></div>` : ''}</div>` : ''}
+      <div class="fsec">Your sign-off</div>${sigPadHtml('pqSig', 'PQA signs here')}
+      <div class="field"><label>PQA remarks</label><input id="pqRemarks" maxlength="500" placeholder="Optional"></div><div class="form-error" id="pqErr"></div></div>
+    <div class="modal-foot"><button class="btn btn-soft-bad" id="pqBack">${ico('undo')}Send back</button><button class="btn btn-ghost" id="pqHold">${ico('hold')}Hold batch</button><span class="grow"></span>
+      <button class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-ok btn-lg" id="pqSign">${ico('pqa')}Sign off</button></div>`, { wide: true, sticky: true });
+  hydrateProxyImages(m.el);
+  const pad = SignaturePad($('#pqSig', m.el));
+  const txn = uuid();
+  $('#pqSign', m.el).addEventListener('click', async (e) => {
+    const err = $('#pqErr', m.el); err.textContent = '';
+    if (pad.isEmpty()) { err.textContent = 'Sign in the box first.'; return; }
+    const done = btnBusy(e.currentTarget, 'Signing…');
+    try {
+      const sig = await uploadBlob(await pad.toBlob(), { batchNo, stage: stageKey, kind: 'PQA_Signature' });
+      const d = await api('pqaSign', { batchNo, stage: stageKey, signature: sig, remarks: $('#pqRemarks', m.el).value, clientTxnId: txn });
+      d._stage = stageKey; m.close(); applyResult(d); flushAlerts();
+      const nb = d.batch;
+      toast(st.name + ' signed off for ' + batchNo + (nb.Status === 'Done' ? ' — the batch is complete.' : '.'), 'ok');
+      if (nb.Status === 'Done' && !nb.FG_TxnID && nb.FG_Code && await confirmBox(batchNo + ' passed Final Audit. Post ' + fmtNum(nb.Good_Qty) + ' to FG stock (' + nb.FG_Code + ') now?', { title: 'Batch complete', eyebrow: 'FG stock', ok: 'Post to FG stock' })) postFg(batchNo);
+    } catch (x) { err.textContent = x.message; } finally { done(); }
+  });
+  $('#pqBack', m.el).addEventListener('click', async () => { m.close(); await sendBack(batchNo, stageKey); });
+  $('#pqHold', m.el).addEventListener('click', async () => { m.close(); await toggleHold(batchNo); });
+}
+ACT['pqa-sign'] = (el) => openPqaSign(el.dataset.b, el.dataset.s);
+async function toggleHold(batchNo) {
+  const b = S.batchBy[batchNo], hold = !info(b).hold;
+  let reason = '';
+  if (hold) { reason = await reasonBox('Put ' + batchNo + ' on PQA hold', 'Why is it on hold?', { ok: 'Hold batch', danger: true, sub: 'Nothing more can be recorded or signed until PQA releases it.' }); if (reason === null) return; }
+  else if (!await confirmBox('Release ' + batchNo + ' from PQA hold?', { title: 'Release hold', ok: 'Release' })) return;
+  try { applyResult(await api('setHold', { batchNo, hold, reason })); flushAlerts(); toast(hold ? batchNo + ' is on hold.' : batchNo + ' released.', 'ok'); } catch (e) { toast(e.message, true); }
+}
+ACT.hold = (el) => toggleHold(el.dataset.b);
+async function sendBack(batchNo, stageKey) {
+  const st = stageByKey(stageKey), c = cardOf(batchNo, stageKey);
+  const removing = signed(c);
+  const reason = await reasonBox((removing ? 'Remove ' : 'Send back ') + st.name + ' — ' + batchNo, removing ? 'Why is this signed card being removed?' : 'What needs fixing?',
+    { danger: true, ok: removing ? 'Remove card' : 'Send back', sub: 'The card is set aside and the stage has to be recorded again. Whoever recorded it is told by email.' });
+  if (reason === null) return;
+  try { const d = await api('voidCard', { batchNo, stage: stageKey, reason }); d._stage = stageKey; applyResult(d); flushAlerts(); toast(st.name + ' sent back.', 'ok'); } catch (e) { toast(e.message, true); }
+}
+ACT['send-back'] = (el) => sendBack(el.dataset.b, el.dataset.s);
+ACT['clear-pqa'] = async (el) => {
+  const reason = await reasonBox('Take back the PQA sign-off', 'Why?', { ok: 'Take back' });
+  if (reason === null) return;
+  try { const d = await api('clearPqa', { batchNo: el.dataset.b, stage: el.dataset.s, reason }); d._stage = el.dataset.s; applyResult(d); toast('Sign-off taken back.'); } catch (e) { toast(e.message, true); }
+};
+
+/* =========================================================================
+   PDF, FG STOCK, QR, LIGHTBOX, SCAN, EXPORT
+   ========================================================================= */
+ACT.pdf = async (el) => {
+  const b = S.batchBy[el.dataset.b];
+  const w = window.open('', '_blank');
+  if (w) w.document.write('<p style="font-family:sans-serif;padding:20px">Making the batch card for ' + esc(b.Batch_No) + '…</p>');
+  const done = btnBusy(el, 'Making PDF…');
+  try {
+    const d = await api('makeBatchPdf', { batchNo: b.Batch_No });
+    applyResult({ batch: d.batch });
+    if (w) w.location.href = d.url; else window.open(d.url, '_blank');
+  } catch (e) { if (w) w.close(); toast(e.message, true); } finally { done(); }
+};
+async function postFg(batchNo) {
+  try {
+    const r = await stockApi('postBatchToFg', { batchNo }, 60000);
+    const d = await api('recordFgPosting', { batchNo, txnId: r.txnId });
+    applyResult(d);
+    toast(batchNo + ': ' + fmtNum(r.qty) + ' posted to FG stock (' + r.txnId + ').', 'ok');
+  } catch (e) { toast(e.message, true); }
+}
+ACT['post-fg'] = async (el) => {
+  const b = S.batchBy[el.dataset.b];
+  if (!b.FG_Code) { toast('No Stock Management FG code for ' + b.Part_Code + '. Set it on the product under Dropdowns → Products.', true); return; }
+  if (!await confirmBox('Post ' + fmtNum(b.Good_Qty) + ' of ' + b.FG_Code + ' to FG stock as Production, with reference ' + b.Batch_No + '?', { title: 'Post to FG stock', ok: 'Post' })) return;
+  const done = btnBusy(el, 'Posting…');
+  await postFg(b.Batch_No); done();
+};
+ACT.qr = (el) => {
+  const b = S.batchBy[el.dataset.b];
+  const url = APP_URL + '#/batch/' + encodeURIComponent(b.Batch_No);
+  const qr = 'https://api.qrserver.com/v1/create-qr-code/?size=420x420&margin=8&data=' + encodeURIComponent(url);
+  const m = openModal(modalHead('QR label', b.Batch_No, 'Scan it with the app (or any camera) to open this batch card.') +
+    `<div class="modal-body" style="align-items:center"><div id="qrLabel" style="text-align:center;padding:14px;border:1px dashed var(--line);border-radius:12px;background:#fff;color:#111">
+      <img src="${qr}" alt="QR" style="width:220px;height:220px;display:block;margin:0 auto"><div style="font-family:var(--mono);font-weight:700;font-size:20px;margin-top:6px">${esc(b.Batch_No)}</div>
+      <div style="font-size:12px">${esc(b.Product_Name || b.Part_Code)}</div><div style="font-size:11px;color:#555">${esc(b.Customer_Name || '')} · ${fmtNum(b.Total_Qty)} pcs</div></div></div>
+    <div class="modal-foot"><button class="btn btn-ghost" data-close>Close</button><button class="btn btn-primary" id="qrPrint">Print label</button></div>`);
+  $('#qrPrint', m.el).addEventListener('click', () => {
+    const w = window.open('', '_blank');
+    w.document.write('<html><head><title>' + esc(b.Batch_No) + '</title></head><body style="margin:0;display:flex;justify-content:center;font-family:Arial">' + $('#qrLabel', m.el).outerHTML + '<script>setTimeout(function(){print()},500)<\/script></body></html>');
+    w.document.close();
+  });
+};
+ACT.lightbox = (el) => {
+  const all = $$('[data-act=lightbox]');
+  let k = all.indexOf(el);
+  const lb = document.createElement('div');
+  lb.id = 'lightbox';
+  const show = () => { const t = all[k]; lb.innerHTML = `<img src="${esc(mediaSrc(t.dataset.mid, 1800) || ($('img', t) || {}).src || '')}" data-mid="${esc(t.dataset.mid)}" data-w="1800" alt=""><div class="lb-cap">${esc(t.dataset.cap || '')} · ${k + 1} / ${all.length}</div>
+      <button class="icon-btn" data-lb="x">${ico('x')}</button>${all.length > 1 ? `<button class="lb-nav lb-prev" data-lb="-1">‹</button><button class="lb-nav lb-next" data-lb="1">›</button>` : ''}`; hydrateProxyImages(lb); };
+  lb.addEventListener('click', e => { const t = e.target.closest('[data-lb]'); if (!t) { if (e.target === lb) lb.remove(); return; } if (t.dataset.lb === 'x') lb.remove(); else { k = (k + Number(t.dataset.lb) + all.length) % all.length; show(); } });
+  show(); document.body.appendChild(lb);
+};
+async function openScan() {
+  const hasDetector = 'BarcodeDetector' in window && navigator.mediaDevices;
+  const m = openModal(modalHead('Open a batch', 'Scan the QR label', hasDetector ? 'Point the camera at the batch card’s QR code.' : 'Type the batch number.') +
+    `<div class="modal-body">${hasDetector ? '<video class="scan-video" id="scanVid" playsinline muted></video>' : ''}
+      <div class="field"><label>Batch number</label><input id="scanNo" placeholder="CMPL0001" autocomplete="off" style="text-transform:uppercase"></div><div class="form-error" id="scanErr"></div></div>
+    <div class="modal-foot"><button class="btn btn-ghost" data-close>Close</button><button class="btn btn-primary" id="scanGo">Open</button></div>`,
+    { onClose: () => { if (stream) stream.getTracks().forEach(t => t.stop()); clearInterval(timer); } });
+  let stream = null, timer = null;
+  const openNo = (no) => { no = String(no || '').trim().toUpperCase(); const hit = S.batchBy[no] || S.D.batches.find(b => String(b.Batch_No).toUpperCase().endsWith(no) && no.length >= 2); if (!hit) { $('#scanErr', m.el).textContent = 'No batch ' + no + '.'; return; } m.close(); go('#/batch/' + hit.Batch_No); };
+  $('#scanGo', m.el).addEventListener('click', () => openNo($('#scanNo', m.el).value));
+  $('#scanNo', m.el).addEventListener('keydown', e => { if (e.key === 'Enter') openNo(e.target.value); });
+  if (!hasDetector) { setTimeout(() => $('#scanNo', m.el).focus(), 50); return; }
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    const v = $('#scanVid', m.el); v.srcObject = stream; await v.play();
+    const det = new BarcodeDetector({ formats: ['qr_code'] });
+    timer = setInterval(async () => {
+      try { const codes = await det.detect(v); if (codes.length) { const raw = codes[0].rawValue; const mm = raw.match(/batch\/([A-Za-z0-9 ]+)/) || raw.match(/(CMPL\s*\d+)/i); openNo(mm ? decodeURIComponent(mm[1]) : raw); } } catch (e) {}
+    }, 350);
+  } catch (e) { $('#scanErr', m.el).textContent = 'Camera not available: ' + e.message; }
+}
+ACT.export = async (el) => {
+  const done = btnBusy(el, 'Exporting…');
+  try {
+    const list = filteredBatches();
+    const nos = new Set(list.map(b => b.Batch_No));
+    const sheets = [{ name: 'Batches', columns: [['Batch_No', 'Batch'], ['Part_Code', 'Part code'], ['Product_Name', 'Product'], ['Customer_Name', 'Customer'], ['Rating', 'Rating'], ['Voltage', 'Voltage'], ['Status', 'Status'], ['Where', 'Where'],
+        ['Total_Qty', 'Total'], ['Good_Qty', 'Good'], ['Reject_Qty', 'Rejected'], ['Yield', 'Yield %'], ['Created', 'Started'], ['Done', 'Completed'], ['FG_TxnID', 'FG entry']].map(c => ({ key: c[0], label: c[1] })),
+      rows: list.map(b => Object.assign({}, b, { Where: info(b).label, Yield: num(b.Total_Qty) ? Math.round(num(b.Good_Qty) / num(b.Total_Qty) * 1000) / 10 : '', Created: dt(b.Created_At), Done: dt(b.Done_At) })) }];
+    stages().forEach(st => {
+      const cols = [['Batch_No', 'Batch'], ['Recorded', 'Recorded'], ['By', 'Recorded by'], ['Total_Qty', 'Total'], ['Reject_Qty', 'Rejected'], ['Good_Qty', 'Good'], ['Reject_Reason', 'Reject reason'], ['Operator', 'Operator']]
+        .concat(st.fields.map(f => [f.key, f.label + (f.unit ? ' (' + f.unit + ')' : '')])).concat([['PQA', 'PQA by'], ['PQAAt', 'PQA at'], ['Remarks', 'Remarks']]);
+      sheets.push({ name: st.no + ' ' + st.name.replace(/&/g, 'and'), columns: cols.map(c => ({ key: c[0], label: c[1] })),
+        rows: (S.D.cards[st.key] || []).filter(c => nos.has(c.Batch_No)).map(c => { const o = Object.assign({}, c, { Recorded: dt(c.Recorded_At), By: nameOf(c.Recorded_By), PQA: nameOf(c.PQA_By), PQAAt: dt(c.PQA_At) });
+          st.fields.filter(f => f.type === 'datetime').forEach(f => { o[f.key] = dt(c[f.key]); }); return o; }) });
+    });
+    const d = await api('exportWorkbook', { filename: 'BatchCards', sheets });
+    const bytes = Uint8Array.from(atob(d.base64), ch => ch.charCodeAt(0));
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })); a.download = d.filename; a.click();
+  } catch (e) { toast(e.message, true); } finally { done(); }
+};
+
+/* =========================================================================
+   DROPDOWNS
+   ========================================================================= */
+function renderDropdowns() {
+  setTitle('Manage', 'Dropdowns');
+  if (!S.D.can.lists) return '<div class="card empty">You don’t have access to change dropdowns.</div>';
+  const lists = Object.assign({}, ...['Customers', 'Ratings', 'Voltages', 'Winding MFD', 'Winding Machines', 'Winding Operators', 'Spray Operators', 'Heat Stabilizing Operators', 'Short Clearing Operators', 'Welding Operators', 'Pouring Operators', 'Testing Operators', 'Auditors', 'Core Sizes', 'Can Sizes', 'Wire Colours', 'Reject Reasons'].map(k => ({ [k]: S.D.lists[k] || [] })), S.D.lists);
+  const names = Object.keys(lists);
+  const cur = S.view.ddList || 'Products';
+  const chip = (n, count) => `<button class="chip ${cur === n ? 'on' : ''}" data-act="ddpick" data-v="${esc(n)}">${esc(n)} <span class="faint">${count}</span></button>`;
+  let body;
+  if (cur === 'Products') {
+    body = `<div class="card"><div class="card-head"><div><h3>Products</h3><p>Choosing a part code on a new batch fills these in. “Stock FG code” links it to Stock Management when the part code differs.</p></div><button class="btn btn-primary btn-sm" data-act="ddedit" data-k="product">${ico('plus')}Add product</button></div>
+      <div class="tbl-wrap" style="margin-top:12px"><table class="tbl"><thead><tr><th>Part code</th><th>Product</th><th>Rating</th><th>Voltage</th><th>Winding MFD</th><th>Film</th><th>Core</th><th>Can</th><th>Stock FG code</th><th></th></tr></thead><tbody>
+      ${S.D.products.slice().sort((a, b) => String(a.Part_Code).localeCompare(String(b.Part_Code))).map(p => `<tr data-act="ddedit" data-k="product" data-id="${esc(p.Row_ID)}"><td class="mono"><b>${esc(p.Part_Code)}</b></td><td>${esc(p.Product_Name)}</td><td>${esc(p.Rating)}</td><td>${esc(p.Voltage)}</td><td>${esc(p.Winding_MFD)}</td><td>${esc(p.Film)}</td><td>${esc(p.Core_Size)}</td><td>${esc(p.Can_Size)}</td><td class="mono">${esc(p.Stock_FG_Code)}</td>
+        <td><button class="icon-btn" data-act="dddel" data-k="product" data-id="${esc(p.Row_ID)}" title="Delete">${ico('trash')}</button></td></tr>`).join('')}</tbody></table></div></div>`;
+  } else if (cur === 'Films') {
+    body = `<div class="card"><div class="card-head"><div><h3>Films</h3><p>Choosing the film on Winding fills micron, width, margin, type and resistivity.</p></div><button class="btn btn-primary btn-sm" data-act="ddedit" data-k="film">${ico('plus')}Add film</button></div>
+      <div class="tbl-wrap" style="margin-top:12px"><table class="tbl"><thead><tr><th>Film</th><th>Micron</th><th>Width</th><th>Free margin</th><th>Type</th><th>Resistivity</th><th></th></tr></thead><tbody>
+      ${S.D.films.map(f => `<tr data-act="ddedit" data-k="film" data-id="${esc(f.Row_ID)}"><td class="mono"><b>${esc(f.Film)}</b></td><td>${esc(f.Micron)}</td><td>${esc(f.Width)}</td><td>${esc(f.Free_Margin)}</td><td>${esc(f.Film_Type)}</td><td>${esc(f.Film_Resistivity)}</td>
+        <td><button class="icon-btn" data-act="dddel" data-k="film" data-id="${esc(f.Row_ID)}" title="Delete">${ico('trash')}</button></td></tr>`).join('')}</tbody></table></div></div>`;
+  } else {
+    const vals = lists[cur] || [];
+    body = `<div class="card" style="max-width:720px"><div class="card-head"><div><h3>${esc(cur)}</h3><p>${plural(vals.length, 'value')}</p></div></div>
+      <div class="dd-add"><input class="input" id="ddNew" placeholder="New value" maxlength="120"><button class="btn btn-primary" data-act="ddadd">Add</button></div>
+      ${vals.map((v, i) => `<div class="dd-row"><span class="grow">${esc(v)}</span>
+        <button class="icon-btn" data-act="ddmove" data-v="${esc(v)}" data-d="-1" ${i === 0 ? 'disabled' : ''} title="Up">${ico('up')}</button><button class="icon-btn" data-act="ddmove" data-v="${esc(v)}" data-d="1" ${i === vals.length - 1 ? 'disabled' : ''} title="Down">${ico('down')}</button>
+        <button class="icon-btn" data-act="ddrename" data-v="${esc(v)}" title="Rename">${ico('edit')}</button><button class="icon-btn" data-act="dddelv" data-v="${esc(v)}" title="Delete">${ico('trash')}</button></div>`).join('') || '<div class="empty">Empty — add the first value above.</div>'}</div>`;
+  }
+  return `<div class="dd-picker">${chip('Products', S.D.products.length)}${chip('Films', S.D.films.length)}${names.map(n => chip(n, (lists[n] || []).length)).join('')}</div>${body}`;
+}
+afterRender.dropdowns = () => { const n = $('#ddNew'); if (n) n.addEventListener('keydown', e => { if (e.key === 'Enter') ACT.ddadd(); }); };
+ACT.ddpick = (el) => { S.view.ddList = el.dataset.v; render(); };
+async function ddSave(params, ok) { try { applyResult(await api('saveList', Object.assign({ list: S.view.ddList }, params))); if (ok) toast(ok, 'ok'); } catch (e) { toast(e.message, true); } }
+ACT.ddadd = () => { const v = $('#ddNew').value.trim(); if (v) ddSave({ op: 'add', value: v }, 'Added ' + v + '.'); };
+ACT.ddmove = (el) => ddSave({ op: 'move', value: el.dataset.v, dir: Number(el.dataset.d) });
+ACT.ddrename = async (el) => { const nv = await reasonBox('Rename ' + el.dataset.v, 'New value', { ok: 'Rename', eyebrow: S.view.ddList, placeholder: el.dataset.v }); if (nv) ddSave({ op: 'rename', value: el.dataset.v, newValue: nv }, 'Renamed.'); };
+ACT.dddelv = async (el) => { if (await confirmBox('Delete “' + el.dataset.v + '” from ' + S.view.ddList + '? Cards that already use it keep it.', { title: 'Delete value', ok: 'Delete', danger: true })) ddSave({ op: 'delete', value: el.dataset.v }, 'Deleted.'); };
+ACT.dddel = async (el, e) => {
+  e.stopPropagation();
+  const kind = el.dataset.k, rec = (kind === 'film' ? S.D.films : S.D.products).find(x => x.Row_ID === el.dataset.id);
+  if (!await confirmBox('Delete ' + (kind === 'film' ? rec.Film : rec.Part_Code) + '?', { title: 'Delete ' + kind, ok: 'Delete', danger: true })) return;
+  try { applyResult(await api('deleteRecord', { kind, Row_ID: el.dataset.id })); toast('Deleted.'); } catch (x) { toast(x.message, true); }
+};
+ACT.ddedit = async (el, e) => {
+  if (e.target.closest('[data-act=dddel]')) return;
+  const kind = el.dataset.k, rec = el.dataset.id ? (kind === 'film' ? S.D.films : S.D.products).find(x => x.Row_ID === el.dataset.id) : {};
+  const fieldsDef = kind === 'film'
+    ? [['Film', 'Film', 'text', true], ['Micron', 'Micron'], ['Width', 'Width'], ['Free_Margin', 'Free margin'], ['Film_Type', 'Film type', 'select', false, ['SERIES', 'STANDARD', 'SLOPE WC', 'WAVE CUT']], ['Film_Resistivity', 'Film resistivity']]
+    : [['Part_Code', 'Part code', 'text', true], ['Product_Name', 'Product name'], ['Rating', 'Rating', 'list', false, 'Ratings'], ['Voltage', 'Voltage', 'list', false, 'Voltages'], ['Winding_MFD', 'Winding MFD', 'list', false, 'Winding MFD'],
+       ['Film', 'Film', 'select', false, S.D.films.map(f => f.Film)], ['Core_Size', 'Core size', 'list', false, 'Core Sizes'], ['Can_Size', 'Can size', 'list', false, 'Can Sizes'], ['Stock_FG_Code', 'Stock FG code (if different)', 'fg']];
+  const input = (f) => {
+    const v = rec[f[0]] || '';
+    if (f[2] === 'select') return `<select id="dd_${f[0]}"><option value="">—</option>${f[4].map(o => `<option ${o === v ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
+    if (f[2] === 'list') return `<input id="dd_${f[0]}" list="dd_${f[0]}_l" value="${esc(v)}" autocomplete="off"><datalist id="dd_${f[0]}_l">${(S.D.lists[f[4]] || []).map(o => `<option value="${esc(o)}">`).join('')}</datalist>`;
+    if (f[2] === 'fg') return `<input id="dd_${f[0]}" list="dd_fg_l" value="${esc(v)}" autocomplete="off" placeholder="Only if Stock uses another code"><datalist id="dd_fg_l"></datalist>`;
+    return `<input id="dd_${f[0]}" value="${esc(v)}" maxlength="120">`;
+  };
+  const m = openModal(modalHead(kind === 'film' ? 'Films' : 'Products', rec.Row_ID ? 'Edit ' + (rec.Film || rec.Part_Code) : 'Add ' + kind) +
+    `<div class="modal-body"><div class="form-grid">${fieldsDef.map(f => `<div class="field ${f[0] === 'Product_Name' ? 'full' : ''}"><label>${esc(f[1])}${f[3] ? ' <span class="req">*</span>' : ''}</label>${input(f)}</div>`).join('')}</div><div class="form-error" id="ddErr"></div></div>
+     <div class="modal-foot"><button class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-primary" id="ddSave">Save</button></div>`);
+  if (kind === 'product') {
+    (S.fgCatalog ? Promise.resolve(S.fgCatalog) : api('getFgCatalog', {}).then(d => (S.fgCatalog = d.items))).then(items => {
+      const dl = $('#dd_fg_l', m.el); if (dl) dl.innerHTML = items.map(it => `<option value="${esc(it[0])}">${esc(it[1])}</option>`).join('');
+    }).catch(() => {});
+  }
+  $('#ddSave', m.el).addEventListener('click', async (ev) => {
+    const p = { Row_ID: rec.Row_ID || '' };
+    fieldsDef.forEach(f => { p[f[0]] = $('#dd_' + f[0], m.el).value.trim(); });
+    const done = btnBusy(ev.currentTarget);
+    try { applyResult(await api(kind === 'film' ? 'saveFilm' : 'saveProduct', p)); m.close(); toast('Saved.', 'ok'); } catch (x) { $('#ddErr', m.el).textContent = x.message; } finally { done(); }
+  });
+};
+
+/* =========================================================================
+   GO
+   ========================================================================= */
+(function init() {
+  setTheme(document.documentElement.getAttribute('data-theme') || 'light');
+  setZoom(currentZoom());
+  wire();
+  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+  S.session = load(SESSION_KEY, true);
+  if (!S.session || !S.session.token) { showLogin(''); return; }
+  showSplash();
+  start();
+})();
+
+</script>
+</body>
+</html>
