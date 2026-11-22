@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="app-version" content="1.0.1">
+<meta name="app-version" content="1.0.2">
 <meta name="theme-color" content="#15181d">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -164,7 +164,7 @@
   .main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
   .topbar { display: flex; align-items: center; gap: 10px; padding: 12px 26px; border-bottom: 1px solid var(--line); background: var(--paper); position: relative; z-index: 5; }
   .topbar h2 { margin: 0; font-size: 19px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .topbar .crumb { font-size: 11px; color: var(--ink-faint); font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+  .topbar .crumb { font-size: 11px; color: var(--ink-faint); font-weight: 700; letter-spacing: .1em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .topbar .grow { flex: 1; min-width: 0; }
   .search { position: relative; width: 300px; }
   .search input { width: 100%; height: 40px; padding: 0 12px 0 36px; border-radius: 11px; border: 1px solid var(--line); background: var(--panel); font-size: 13.5px; }
@@ -385,6 +385,12 @@
     .pipeline { grid-template-columns: repeat(4, minmax(0, 1fr)); }
     .scard-body { grid-template-columns: 1fr; }
     .search { width: 220px; }
+    #sync { display: none !important; }
+  }
+  @media (max-width: 960px) {
+    .zoom-ctl { display: none !important; }
+    .search { width: 170px; }
+    #newBatchBtn { font-size: 0; gap: 0; padding-left: 11px; padding-right: 11px; }
   }
   @media (max-width: 780px) {
     .phone-only { display: revert !important; }
@@ -534,7 +540,7 @@
    behind the figures already on screen.
    ========================================================================= */
 
-const APP_VERSION = '1.0.1';
+const APP_VERSION = '1.0.2';
 const BCT_API_URL = 'https://script.google.com/macros/s/AKfycbxdCU4dK92I_Q5mlzhp9cEw_efeX5bVfkfLfqbNf_5eDpyj1RljUh0WqO-Y5-t3RhNZ/exec';
 const STOCK_API_URL = 'https://script.google.com/macros/s/AKfycbzs_aW0G-NvVvs-_Yk41d4esq1lkKVBTzQEQTrbbIKe7kQfoYdXD3cuhd6Wt2UQ6MU0/exec';
 const APP_URL = 'https://calgas.github.io/Batch-Card-Tracker/';
@@ -755,6 +761,10 @@ function stepsBar(b) {
   }).join('') + '</div>';
 }
 function openBatches() { return S.D.batches.filter(b => info(b).open); }
+// Yield counts the rejects actually recorded. Good can't be compared with the
+// batch total: the count changes from elements to capacitors along the way
+// (718 elements wound, 359 capacitors packed), which is not a loss.
+function yieldOf(good, rejected) { return good + rejected ? pct(good, good + rejected) : '—'; }
 
 /* ---------- media ---------- */
 function mediaMode() { return (S.D && S.D.settings && S.D.settings.mediaMode) || 'public'; }
@@ -1053,7 +1063,7 @@ function renderOverview() {
   const now = new Date(), monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
   const doneMonth = B.filter(b => info(b).done && b.Done_At && b.Done_At >= monthStart);
   const done30 = B.filter(b => info(b).done && b.Done_At && b.Done_At >= Date.now() - 30 * DAY);
-  const tot30 = done30.reduce((s, b) => s + num(b.Total_Qty), 0), good30 = done30.reduce((s, b) => s + num(b.Good_Qty), 0);
+  const rej30 = done30.reduce((s, b) => s + num(b.Reject_Qty), 0), good30 = done30.reduce((s, b) => s + num(b.Good_Qty), 0);
   const wip = open.reduce((s, b) => s + num(b.Good_Qty), 0);
   const oldestPqa = pqa.slice().sort((a, b) => (a.Last_Activity || 0) - (b.Last_Activity || 0))[0];
 
@@ -1063,7 +1073,7 @@ function renderOverview() {
     kpi('On PQA hold', fmtNum(hold.length), hold.length ? hold.slice(0, 2).map(b => b.Batch_No).join(', ') : 'none held', 'hold', hold.length ? 'alert' : '', '#/pqa', 'var(--bad-soft)') +
     kpi('No movement ' + S.D.settings.stuckHours + ' h+', fmtNum(stuck.length), stuck.length ? 'needs a push' : 'all moving', 'clock', stuck.length ? 'alert' : '', '#/batches?stuck', 'var(--bad-soft)') +
     kpi('Completed this month', fmtNum(doneMonth.length), fmtNum(doneMonth.reduce((s, b) => s + num(b.Good_Qty), 0)) + ' good pieces', 'check', '', '#/batches', 'var(--ok-soft)') +
-    kpi('Yield, last 30 days', tot30 ? pct(good30, tot30) : '—', tot30 ? fmtNum(tot30 - good30) + ' rejected of ' + fmtNum(tot30) : 'no batch completed', 'box', '', '#/batches', 'var(--azure-soft)') +
+    kpi('Yield, last 30 days', done30.length ? yieldOf(good30, rej30) : '—', done30.length ? fmtNum(rej30) + ' rejected · ' + fmtNum(good30) + ' good' : 'no batch completed', 'box', '', '#/batches', 'var(--azure-soft)') +
     '</div>';
 
   const pipe = stages().map((st, i) => {
@@ -1176,7 +1186,7 @@ function renderBatches() {
   } else {
     body = `<div class="card tbl-wrap"><table class="tbl"><thead><tr><th>Batch</th><th>Product</th><th>Customer</th><th>Where</th><th class="num">Total</th><th class="num">Good</th><th class="num">Yield</th><th>Started</th><th>Last activity</th></tr></thead><tbody>` +
       list.map(b => `<tr data-act="open-batch" data-b="${esc(b.Batch_No)}"><td><b class="mono">${esc(b.Batch_No)}</b></td><td>${esc(b.Product_Name || b.Part_Code)}<div class="faint mono" style="font-size:11px">${esc(b.Part_Code)}</div></td>
-        <td>${esc(b.Customer_Name || '')}</td><td>${statusBadge(b)}</td><td class="num">${fmtNum(b.Total_Qty)}</td><td class="num">${fmtNum(b.Good_Qty)}</td><td class="num">${pct(num(b.Good_Qty), num(b.Total_Qty))}</td>
+        <td>${esc(b.Customer_Name || '')}</td><td>${statusBadge(b)}</td><td class="num">${fmtNum(b.Total_Qty)}</td><td class="num">${fmtNum(b.Good_Qty)}</td><td class="num">${yieldOf(num(b.Good_Qty), num(b.Reject_Qty))}</td>
         <td>${dt(b.Created_At, false)}</td><td>${ago(b.Last_Activity)}</td></tr>`).join('') + '</tbody></table></div>';
   }
   return `<div class="page-head"><div><p style="margin:0">${plural(list.length, 'batch', 'batches')} shown</p></div>
@@ -1274,7 +1284,7 @@ function renderBatch(r) {
       <span>Started <b>${dt(b.Created_At)}</b> by ${esc(nameOf(b.Created_By))}</span></div>${b.Remarks ? `<div class="note">${esc(b.Remarks)}</div>` : ''}</div>
       <div class="bactions">${acts.join('')}</div></div>
     <div class="bstats"><div><small>Total</small><b>${fmtNum(b.Total_Qty)}</b></div><div><small>Good now</small><b style="color:var(--ok)">${fmtNum(b.Good_Qty)}</b></div><div><small>Rejected</small><b style="color:${num(b.Reject_Qty) ? 'var(--bad)' : 'inherit'}">${fmtNum(b.Reject_Qty || 0)}</b></div>
-      <div><small>Yield</small><b>${pct(num(b.Good_Qty), num(b.Total_Qty))}</b></div><div><small>${i.done ? 'Completed' : 'Last activity'}</small><b style="font-size:14px">${i.done ? dt(b.Done_At, false) : ago(b.Last_Activity)}</b></div></div>
+      <div><small>Yield</small><b>${yieldOf(num(b.Good_Qty), num(b.Reject_Qty))}</b></div><div><small>${i.done ? 'Completed' : 'Last activity'}</small><b style="font-size:14px">${i.done ? dt(b.Done_At, false) : ago(b.Last_Activity)}</b></div></div>
     <div style="border-top:1px solid var(--line-soft)"><div class="stepper">${stepper}</div></div>${holdNote}${fgNote}</div>
     ${cards}
     <div style="margin-top:16px;text-align:center"><button class="btn btn-ghost btn-sm" data-act="history" data-b="${esc(b.Batch_No)}">${ico('clock')}Show the full history</button><div id="historyBox"></div></div>`;
@@ -1887,7 +1897,7 @@ ACT.export = async (el) => {
     const nos = new Set(list.map(b => b.Batch_No));
     const sheets = [{ name: 'Batches', columns: [['Batch_No', 'Batch'], ['Part_Code', 'Part code'], ['Product_Name', 'Product'], ['Customer_Name', 'Customer'], ['Rating', 'Rating'], ['Voltage', 'Voltage'], ['Status', 'Status'], ['Where', 'Where'],
         ['Total_Qty', 'Total'], ['Good_Qty', 'Good'], ['Reject_Qty', 'Rejected'], ['Yield', 'Yield %'], ['Created', 'Started'], ['Done', 'Completed'], ['FG_TxnID', 'FG entry']].map(c => ({ key: c[0], label: c[1] })),
-      rows: list.map(b => Object.assign({}, b, { Where: info(b).label, Yield: num(b.Total_Qty) ? Math.round(num(b.Good_Qty) / num(b.Total_Qty) * 1000) / 10 : '', Created: dt(b.Created_At), Done: dt(b.Done_At) })) }];
+      rows: list.map(b => Object.assign({}, b, { Where: info(b).label, Yield: num(b.Good_Qty) + num(b.Reject_Qty) ? Math.round(num(b.Good_Qty) / (num(b.Good_Qty) + num(b.Reject_Qty)) * 1000) / 10 : '', Created: dt(b.Created_At), Done: dt(b.Done_At) })) }];
     stages().forEach(st => {
       const cols = [['Batch_No', 'Batch'], ['Recorded', 'Recorded'], ['By', 'Recorded by'], ['Total_Qty', 'Total'], ['Reject_Qty', 'Rejected'], ['Good_Qty', 'Good'], ['Reject_Reason', 'Reject reason'], ['Operator', 'Operator']]
         .concat(st.fields.map(f => [f.key, f.label + (f.unit ? ' (' + f.unit + ')' : '')])).concat([['PQA', 'PQA by'], ['PQAAt', 'PQA at'], ['Remarks', 'Remarks']]);
