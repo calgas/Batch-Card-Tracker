@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
-<meta name="app-version" content="1.5.2">
+<meta name="app-version" content="1.5.3">
 <meta name="theme-color" content="#15181d">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -1014,7 +1014,7 @@ const AppPrompts = (function () {
    behind the figures already on screen.
    ========================================================================= */
 
-const APP_VERSION = '1.5.2';
+const APP_VERSION = '1.5.3';
 const BCT_API_URL = 'https://script.google.com/macros/s/AKfycbxdCU4dK92I_Q5mlzhp9cEw_efeX5bVfkfLfqbNf_5eDpyj1RljUh0WqO-Y5-t3RhNZ/exec';
 const STOCK_API_URL = 'https://script.google.com/macros/s/AKfycbzs_aW0G-NvVvs-_Yk41d4esq1lkKVBTzQEQTrbbIKe7kQfoYdXD3cuhd6Wt2UQ6MU0/exec';
 const APP_URL = 'https://calgas.github.io/Batch-Card-Tracker/';
@@ -1607,8 +1607,8 @@ function render() {
     setTimeout(() => {
       if (!S.D.can.create) { toast('You don’t have access to create batches.', true); return; }
       if (q.get('line') && !line) toast('That order line isn’t open any more.', true);
-      openBatchForm(null, { part: prod ? prod.Part_Code : '', line: line ? line.lineId : '' });
-      if (line && !prod) toast('No product here for ' + line.fgCode + '. Add it under Dropdowns → Products with Stock FG code ' + line.fgCode + '.', true);
+      // A product not in Products yet comes from the Stock FG list when the batch is saved.
+      openBatchForm(null, { part: prod ? prod.Part_Code : line ? line.fgCode : '', line: line ? line.lineId : '' });
     }, 60);
   }
   renderNav();
@@ -2702,7 +2702,7 @@ function openBatchForm(batch, pre) {
   const dl = (id, arr) => `<datalist id="${id}">${arr.map(o => `<option value="${esc(o)}">`).join('')}</datalist>`;
   const m = openModal(modalHead(edit ? 'Edit batch' : 'New batch', edit ? batch.Batch_No : 'Plan a new batch card', edit ? '' : 'The batch number is given when you save.') +
     `<div class="modal-body"><div class="form-grid">
-      <div class="field full"><label>Part code <span class="req">*</span></label><input id="bfPart" list="bfParts" autocomplete="off" value="${esc(edit ? batch.Part_Code : pre.part || '')}" placeholder="Type to search products">
+      <div class="field full"><label>Part code <span class="req">*</span></label><input id="bfPart" list="bfParts" autocomplete="off" value="${esc(edit ? batch.Part_Code : pre.part || '')}" placeholder="Type to search products and Stock FG items">
         <datalist id="bfParts">${products.map(p => `<option value="${esc(p.Part_Code)}">${esc(p.Product_Name || '')}</option>`).join('')}</datalist><div class="hint" id="bfProd"></div></div>
       <div class="field full"><label for="bfOrder">For order</label><select id="bfOrder"></select><div class="hint" id="bfOrderHint"></div></div>
       <div class="field"><label for="bfCust">Customer<span class="af hidden" id="bfCustTag"></span></label><input id="bfCust" list="bfCustL" data-new="Customers" maxlength="120" value="${esc(edit ? batch.Customer_Name || '' : '')}" placeholder="No customer">${dl('bfCustL', customers)}</div>
@@ -2717,7 +2717,36 @@ function openBatchForm(batch, pre) {
     </div><div class="form-error" id="bfErr"></div></div>
     <div class="modal-foot"><button class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-primary" id="bfSave">${edit ? 'Save changes' : 'Create batch'}</button></div>`);
   const $m = (q) => $(q, m.el);
-  const findProd = () => products.find(x => String(x.Part_Code).toUpperCase() === $m('#bfPart').value.trim().toUpperCase());
+  // The part code can be a product, or any FG item of Stock Management not in
+  // Products yet: that one becomes a product when the batch is saved (1.5.3),
+  // so an order's "Open batch" never stops at Dropdowns → Products.
+  const preLine = pre.line ? ((S.D.orders && S.D.orders.lines) || []).find(l => l.lineId === pre.line) : null;
+  const fromStock = (code) => {
+    const c = String(code || '').trim().toUpperCase();
+    if (!c) return null;
+    const it = (S.fgCatalog || []).find(x => String(x[0]).toUpperCase() === c);
+    if (it) return { Part_Code: it[0], Product_Name: it[1], Stock_FG_Code: it[0], _fromStock: true };
+    if (preLine && String(preLine.fgCode).toUpperCase() === c) return { Part_Code: preLine.fgCode, Product_Name: preLine.product, Stock_FG_Code: preLine.fgCode, _fromStock: true };
+    return null;
+  };
+  const findProd = () => {
+    const c = $m('#bfPart').value.trim().toUpperCase();
+    return products.find(x => String(x.Part_Code).toUpperCase() === c) || products.find(x => String(x.Stock_FG_Code || '').toUpperCase() === c && c) || fromStock(c);
+  };
+  // The Stock FG list is fetched once, then offered under the products.
+  const addStockOptions = (items) => {
+    const known = {};
+    products.forEach(x => { known[String(x.Part_Code).toUpperCase()] = 1; if (x.Stock_FG_Code) known[String(x.Stock_FG_Code).toUpperCase()] = 1; });
+    $m('#bfParts').insertAdjacentHTML('beforeend', items.filter(it => !known[String(it[0]).toUpperCase()])
+      .map(it => `<option value="${esc(it[0])}" label="${esc((it[1] || '') + ' · from the Stock FG list')}"></option>`).join(''));
+  };
+  {
+    (S.fgCatalog ? Promise.resolve(S.fgCatalog) : api('getFgCatalog', {}).then(d => (S.fgCatalog = d.items))).then(items => {
+      if (!document.body.contains(m.el)) return;
+      addStockOptions(items || []);
+      showProd(); fillOrders(); if (!edit && pre.line && !$m('#bfOrder').value) { fillOrders(); pickOrder(true); }
+    }).catch(() => {});
+  }
   let custAuto = !edit;
   $m('#bfCust').addEventListener('input', () => { custAuto = false; $m('#bfCustTag').classList.add('hidden'); });
   // Winding MFD, elements per capacitor and connection come from the product until changed by hand.
@@ -2725,7 +2754,8 @@ function openBatchForm(batch, pre) {
   Object.keys(fromProd).forEach(id => $m('#' + id).addEventListener('input', () => { fromProd[id][1] = false; $m('#' + id + 'Tag').classList.add('hidden'); plan(); }));
   const fillFromProd = (p) => Object.keys(fromProd).forEach(id => {
     if (!fromProd[id][1]) return;
-    const v = p && !blankV(p[fromProd[id][0]]) ? String(p[fromProd[id][0]]) : (id === 'bfPer' && p ? '1' : '');
+    // A product new from the Stock FG list has no elements count yet: asked for, not guessed.
+    const v = p && !blankV(p[fromProd[id][0]]) ? String(p[fromProd[id][0]]) : (id === 'bfPer' && p && !p._fromStock ? '1' : '');
     $m('#' + id).value = v;
     $m('#' + id + 'Tag').textContent = p && !blankV(p[fromProd[id][0]]) ? 'Product' : '';
     $m('#' + id + 'Tag').classList.toggle('hidden', !(p && !blankV(p[fromProd[id][0]])));
@@ -2744,7 +2774,7 @@ function openBatchForm(batch, pre) {
   $m('#bfQty').addEventListener('input', plan);
   const showProd = () => {
     const p = findProd(), typed = $m('#bfPart').value.trim();
-    $m('#bfProd').textContent = p ? [p.Product_Name, p.Rating, p.Voltage].filter(Boolean).join(' · ') : (typed ? 'Not in Products: pick a part code from the list.' : '');
+    $m('#bfProd').textContent = p ? [p.Product_Name, p.Rating, p.Voltage].filter(Boolean).join(' · ') + (p._fromStock ? ' — from the Stock FG list; added to Products when you save' : '') : (typed ? 'Not in Products or the Stock FG list: pick a part code from the list.' : '');
     $m('#bfProd').classList.toggle('warn', !p && !!typed);
     fillFromProd(p);
     // The last batch of this product: its customer is filled in, its quantity shown.
@@ -2793,7 +2823,7 @@ function openBatchForm(batch, pre) {
                 connection: $m('#bfConn').value.trim(), windingMfd: $m('#bfMfd').value.trim() };
     if (edit && (p.orderLine || '') === (batch.Order_Line || '')) delete p.orderLine;
     const prod = findProd();
-    if (!prod) { err.textContent = p.partCode ? p.partCode + ' isn’t in Products. Pick a part code from the list, or add the product under Dropdowns → Products.' : 'Choose the part code.'; return; }
+    if (!prod) { err.textContent = p.partCode ? p.partCode + ' isn’t in Products or the Stock FG list. Pick a part code from the list.' : 'Choose the part code.'; return; }
     p.partCode = prod.Part_Code;
     if (!(num(qty) > 0) || Math.round(num(qty)) !== num(qty)) { err.textContent = legacy ? 'Total quantity must be a whole number above 0.' : 'Quantity must be a whole number of capacitors above 0.'; return; }
     if (legacy && !perRaw) { p.totalQty = qty; delete p.connection; delete p.windingMfd; }
@@ -2809,7 +2839,7 @@ function openBatchForm(batch, pre) {
       if (edit) { p.batchNo = batch.Batch_No; if ($m('#bfReason')) p.reason = $m('#bfReason').value; d = await api('updateBatch', p); }
       else { p.clientTxnId = txn; d = await api('createBatch', p); }
       m.close(); applyResult(d);
-      toast(edit ? 'Saved.' : d.batch.Batch_No + ' created.', 'ok');
+      toast((edit ? 'Saved.' : d.batch.Batch_No + ' created.') + (prod._fromStock ? ' ' + prod.Part_Code + ' added to Products.' : ''), 'ok');
       if (!edit) { go('#/batch/' + d.batch.Batch_No); if (S.D.can.stages.WIN && await confirmBox('Record Winding for ' + d.batch.Batch_No + ' now?', { title: 'Batch created', eyebrow: d.batch.Batch_No, ok: 'Record Winding' })) openCardForm(d.batch.Batch_No, 'WIN'); }
     } catch (x) { err.textContent = x.message; } finally { done(); }
   });
