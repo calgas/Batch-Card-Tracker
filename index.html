@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
-<meta name="app-version" content="1.5.3">
+<meta name="app-version" content="1.5.4">
 <meta name="theme-color" content="#15181d">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -1014,7 +1014,7 @@ const AppPrompts = (function () {
    behind the figures already on screen.
    ========================================================================= */
 
-const APP_VERSION = '1.5.3';
+const APP_VERSION = '1.5.4';
 const BCT_API_URL = 'https://script.google.com/macros/s/AKfycbxdCU4dK92I_Q5mlzhp9cEw_efeX5bVfkfLfqbNf_5eDpyj1RljUh0WqO-Y5-t3RhNZ/exec';
 const STOCK_API_URL = 'https://script.google.com/macros/s/AKfycbzs_aW0G-NvVvs-_Yk41d4esq1lkKVBTzQEQTrbbIKe7kQfoYdXD3cuhd6Wt2UQ6MU0/exec';
 const APP_URL = 'https://calgas.github.io/Batch-Card-Tracker/';
@@ -3259,16 +3259,165 @@ ACT['clear-pqa'] = async (el) => {
 /* =========================================================================
    PDF, FG STOCK, QR, LIGHTBOX, SCAN, EXPORT
    ========================================================================= */
+// The batch card opens in a new tab. While it is made there, that tab shows a
+// loading page: logo, a ring with the percentage, the steps. The percentage
+// follows how long cards with this many photos and signatures have taken on
+// this device. A card with nothing changed since it was made is opened as it
+// is (web 1.5.4 / backend 1.4.2).
+const CARD_MEDIA = ['Photo_1', 'Photo_2', 'Sup_Signature', 'PQA_Signature'];
+function cardImageCount(no) {
+  return stages().reduce((n, st) => n + (S.D.cards[st.key] || []).filter(c => c.Batch_No === no && c.Status !== 'Void')
+    .reduce((m, c) => m + CARD_MEDIA.filter(k => c[k] && String(c[k]).indexOf('missing:') !== 0).length, 0), 0);
+}
+const cardBaseMs = (imgs) => 5500 + 650 * imgs;
+function cardSpeed() { const v = num(load('bct_pdf_speed')); return v >= 0.3 && v <= 5 ? v : 1; }
+function learnCardSpeed(ms, imgs) {
+  const r = Math.min(5, Math.max(0.3, ms / cardBaseMs(imgs)));
+  store('bct_pdf_speed', Math.round((cardSpeed() * 0.6 + r * 0.4) * 1000) / 1000);
+}
+function cardLoaderHtml(info) {
+  const dark = info.dark, base = info.base;
+  const font = (w) => `@font-face{font-family:Montserrat;font-weight:${w};font-display:swap;src:url(${base}brand/fonts/montserrat-${w}.woff2) format("woff2")}`;
+  const steps = [
+    ['Reading the batch and its stage cards', 12],
+    [info.imgs ? 'Adding ' + info.imgs + ' photo' + (info.imgs === 1 ? '' : 's') + ' and signature' + (info.imgs === 1 ? '' : 's') : 'Collecting the stage records', 62],
+    ['Laying out the A4 pages', 88],
+    ['Saving the PDF to Drive', 100]];
+  return `<!DOCTYPE html><html lang="en" data-theme="${dark ? 'dark' : 'light'}"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Batch card ${esc(info.no)}</title>
+<link rel="icon" href="${base}brand/calgas-mark.png">
+<style>
+${[500, 600, 700, 800].map(font).join('')}
+:root{--bg1:#f4f3fa;--bg2:#e9ecf5;--card:#fff;--ink:#1f2a37;--soft:#6b7380;--faint:#9aa2ad;--line:#e6e8ef;--brand:#3d3d8e;--brand2:#6d6ddb;--track:#ebebf5;--ok:#2f7d4f;--bad:#b4372b;--glow:rgba(61,61,142,.16)}
+[data-theme=dark]{--bg1:#0d1219;--bg2:#141b25;--card:#18212c;--ink:#e8ecf2;--soft:#a4adba;--faint:#6f7a88;--line:#263140;--brand:#a3a3f5;--brand2:#7b7bea;--track:#263040;--ok:#5cc08a;--bad:#ef7b6e;--glow:rgba(123,123,234,.18)}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{font-family:Montserrat,"Segoe UI",Arial,sans-serif;color:var(--ink);background:radial-gradient(1200px 600px at 50% -10%,var(--glow),transparent 60%),linear-gradient(160deg,var(--bg1),var(--bg2));display:flex;align-items:center;justify-content:center;padding:24px;color-scheme:${dark ? 'dark' : 'light'}}
+.card{width:100%;max-width:460px;background:var(--card);border:1px solid var(--line);border-radius:24px;padding:34px 34px 26px;box-shadow:0 24px 60px -24px rgba(20,24,60,.35),0 2px 6px rgba(20,24,60,.06);text-align:center;animation:rise .45s cubic-bezier(.2,.8,.2,1) both}
+@keyframes rise{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:none}}
+.logo{height:46px;display:block;margin:0 auto}
+.co{margin-top:12px;font-size:10.5px;font-weight:600;letter-spacing:.3em;color:var(--brand);opacity:.85}
+.rule{height:1px;background:var(--line);margin:22px 0 24px}
+.ring{position:relative;width:168px;height:168px;margin:0 auto}
+.ring svg{width:100%;height:100%;transform:rotate(-90deg);overflow:visible}
+.ring .tr{fill:none;stroke:var(--track);stroke-width:11}
+.ring .pg{fill:none;stroke:url(#g);stroke-width:11;stroke-linecap:round;filter:drop-shadow(0 4px 10px var(--glow))}
+.ring .mid{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.pct{font-size:40px;font-weight:800;letter-spacing:-.02em;line-height:1;font-variant-numeric:tabular-nums}
+.pct small{font-size:18px;font-weight:700;margin-left:2px;color:var(--soft)}
+.lbl{margin-top:6px;font-size:9.5px;font-weight:700;letter-spacing:.22em;color:var(--soft)}
+.ring.pulse::before{content:"";position:absolute;inset:-10px;border-radius:50%;background:radial-gradient(circle,var(--glow),transparent 70%);animation:pulse 2.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.45;transform:scale(.96)}50%{opacity:1;transform:scale(1.04)}}
+.bno{margin-top:22px;font-size:24px;font-weight:800;letter-spacing:.02em}
+.prod{margin-top:4px;font-size:12.5px;font-weight:500;color:var(--soft);line-height:1.45}
+.head{margin-top:18px;font-size:14px;font-weight:700}
+.steps{list-style:none;margin:16px auto 0;padding:0;max-width:330px;text-align:left}
+.steps li{display:flex;align-items:center;gap:12px;padding:7px 0;font-size:13px;font-weight:500;color:var(--faint);transition:color .3s}
+.steps li.on{color:var(--ink);font-weight:600}.steps li.ok{color:var(--soft)}
+.dot{flex:none;width:20px;height:20px;border-radius:50%;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;transition:all .3s}
+.on .dot{border-color:var(--brand);border-right-color:transparent;animation:spin .8s linear infinite}
+.ok .dot{background:var(--brand);border-color:var(--brand)}
+.ok .dot::after{content:"";width:5px;height:9px;border:solid #fff;border-width:0 2px 2px 0;transform:translateY(-1px) rotate(45deg)}
+[data-theme=dark] .ok .dot::after{border-color:#18212c}
+@keyframes spin{to{transform:rotate(360deg)}}
+.note{margin-top:18px;font-size:12px;font-weight:500;color:var(--faint);line-height:1.5;min-height:18px}
+.msg{margin-top:16px;font-size:13px;line-height:1.55;color:var(--soft)}
+.err .pg{stroke:var(--bad)}.err .pct{color:var(--bad)}
+.btn{margin-top:18px;font:600 13px Montserrat,Arial,sans-serif;padding:11px 22px;border-radius:12px;border:0;background:var(--brand);color:${dark ? '#141b25' : '#fff'};cursor:pointer}
+.hide{display:none}
+@media (max-width:420px){.card{padding:28px 22px 22px;border-radius:20px}.ring{width:150px;height:150px}.pct{font-size:36px}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style></head><body>
+<div class="card" id="card">
+  <img class="logo" src="${base}brand/calgas-logo${dark ? '-white' : ''}.png" alt="CALGAS Capacitors">
+  <div class="co">CALGAS MOBILITY PVT. LTD.</div>
+  <div class="rule"></div>
+  <div class="ring pulse" id="ring"><svg viewBox="0 0 168 168"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--brand2)"/><stop offset="1" stop-color="var(--brand)"/></linearGradient></defs>
+    <circle class="tr" cx="84" cy="84" r="72"/><circle class="pg" id="pg" cx="84" cy="84" r="72" stroke-dasharray="452.4" stroke-dashoffset="452.4"/></svg>
+    <div class="mid"><div class="pct" id="pct">0<small>%</small></div><div class="lbl">BATCH CARD</div></div></div>
+  <div class="bno">${esc(info.no)}</div>
+  <div class="prod">${esc([info.part, info.product].filter(Boolean).join(' · '))}</div>
+  <div class="head" id="head">Making the batch card</div>
+  <ul class="steps" id="steps">${steps.map((x, i) => `<li data-i="${i}"><span class="dot"></span><span>${esc(x[0])}</span></li>`).join('')}</ul>
+  <div class="msg hide" id="msg"></div>
+  <button class="btn hide" id="close" onclick="window.close()">Close this tab</button>
+  <div class="note" id="note"></div>
+</div>
+<script>
+(function () {
+  var EST = ${Math.max(2500, Math.round(info.est))}, ENDS = ${JSON.stringify(steps.map(x => x[1]))}, NO = ${JSON.stringify(String(info.no))};
+  var t0 = performance.now(), shown = 0, target = 0, state = 'run', url = '', speed = 0.08;
+  var $ = function (id) { return document.getElementById(id); }, C = 452.4;
+  function model(t) { return 94 * (1 - Math.exp(-t / (EST / 2.4))); }
+  function paint(p) {
+    var v = Math.floor(p + 1e-6);
+    $('pg').setAttribute('stroke-dashoffset', String(C * (1 - p / 100)));
+    $('pct').innerHTML = (state === 'fail' ? '!' : v) + (state === 'fail' ? '' : '<small>%</small>');
+    document.title = (state === 'fail' ? 'Not made' : v + '%') + ' · Batch card ' + NO;
+    if (state === 'reused') return;
+    var lis = document.querySelectorAll('#steps li'), from = 0;
+    for (var i = 0; i < lis.length; i++) {
+      var end = ENDS[i];
+      lis[i].className = p >= end - 0.01 || (state === 'done' && p >= 99.5) ? 'ok' : p >= from ? 'on' : '';
+      from = end;
+    }
+  }
+  function note(t) {
+    if (state !== 'run') return;
+    var left = Math.round((EST - t) / 1000);
+    $('note').textContent = left > 1 ? 'About ' + left + ' s left · you can switch tabs, it keeps going' : t < EST * 2.2 ? 'Almost there…' : 'Taking longer than usual, still working…';
+  }
+  function frame(now) {
+    var t = now - t0;
+    if (state === 'run') target = Math.max(target, model(t));
+    shown += (target - shown) * speed; if (Math.abs(target - shown) < 0.05) shown = target;
+    paint(shown); note(t);
+    if ((state === 'done' || state === 'reused') && shown >= 99.95) { setTimeout(function () { location.replace(url); }, 380); return; }
+    if (state !== 'fail') requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+  window.__bcDone = function (u, reused, madeAt) {
+    url = u; target = 100; speed = reused ? 0.16 : 0.12;
+    state = reused ? 'reused' : 'done';
+    $('ring').classList.remove('pulse');
+    if (reused) {
+      $('head').textContent = 'Nothing has changed';
+      $('steps').classList.add('hide');
+      $('msg').classList.remove('hide');
+      $('msg').textContent = 'This card is up to date' + (madeAt ? ' (made ' + madeAt + ')' : '') + '. Opening the saved copy.';
+    } else $('head').textContent = 'Ready';
+    $('note').textContent = 'Opening the PDF…';
+  };
+  window.__bcFail = function (m) {
+    state = 'fail'; $('ring').classList.remove('pulse'); $('card').classList.add('err'); paint(shown);
+    $('head').textContent = 'The batch card could not be made';
+    $('steps').classList.add('hide'); $('msg').classList.remove('hide'); $('msg').textContent = m || 'Please try again.';
+    $('close').classList.remove('hide'); $('note').textContent = '';
+  };
+})();
+<\/script></body></html>`;
+}
 ACT.pdf = async (el) => {
   const b = S.batchBy[el.dataset.b];
+  const imgs = cardImageCount(b.Batch_No), est = cardBaseMs(imgs) * cardSpeed();
   const w = window.open('', '_blank');
-  if (w) w.document.write('<p style="font-family:sans-serif;padding:20px">Making the batch card for ' + esc(b.Batch_No) + '…</p>');
+  if (w) {
+    try {
+      w.document.open();
+      w.document.write(cardLoaderHtml({ no: b.Batch_No, part: b.Part_Code, product: b.Product_Name, imgs, est,
+        dark: document.documentElement.getAttribute('data-theme') === 'dark', base: new URL('./', location.href).href }));
+      w.document.close();
+    } catch (e) {}
+  }
+  const call = (fn, ...a) => { try { if (w && !w.closed && w[fn]) w[fn](...a); } catch (e) {} };
   const done = btnBusy(el, 'Making PDF…');
+  const t0 = Date.now();
   try {
     const d = await api('makeBatchPdf', { batchNo: b.Batch_No });
     applyResult({ batch: d.batch });
-    if (w) w.location.href = d.url; else window.open(d.url, '_blank');
-  } catch (e) { if (w) w.close(); toast(e.message, true); } finally { done(); }
+    if (!d.reused) learnCardSpeed(Date.now() - t0, imgs);
+    if (w && !w.closed) call('__bcDone', d.url, !!d.reused, d.reused && d.batch.PDF_At ? dt(d.batch.PDF_At) : '');
+    else window.open(d.url, '_blank');
+  } catch (e) { if (w && !w.closed) call('__bcFail', e.message); toast(e.message, true); } finally { done(); }
 };
 async function postFg(batchNo) {
   try {
