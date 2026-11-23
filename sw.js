@@ -4,7 +4,7 @@
 // (cache-first, newest 800), so a card opened once opens instantly after.
 // API requests are never cached.
 const CACHE_PREFIX = 'bct-shell-';
-const CACHE_VERSION = CACHE_PREFIX + 'v9';
+const CACHE_VERSION = CACHE_PREFIX + 'v10';
 const MEDIA_CACHE = 'bct-media-img-v1';
 const SHELL = ['./', './index.html', './manifest.json'];
 
