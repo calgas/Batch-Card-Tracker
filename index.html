@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
-<meta name="app-version" content="1.4.0">
+<meta name="app-version" content="1.5.0">
 <meta name="theme-color" content="#15181d">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -127,6 +127,13 @@
   .sug-it.on { background: var(--copper-soft); }
   .sug-it.on b { color: var(--copper); }
   .sug-none { padding: 10px 12px; font-size: 12.5px; color: var(--ink-faint); }
+  .sug-it.sug-new b { color: var(--copper); }
+  .sug-it.sug-new small { color: var(--ink-soft); }
+  .plan-line { font-size: 13px; color: var(--ink-soft); background: var(--panel-2); border: 1px solid var(--line-soft); border-radius: 10px; padding: 9px 12px; line-height: 1.5; }
+  .plan-line b { color: var(--ink); }
+  .plan-line.warn { color: var(--warn); }
+  .qty-note { font-size: 12.5px; color: var(--ink-soft); margin: -4px 0 6px; }
+  .unit-tag { font-size: 11px; font-weight: 600; color: var(--ink-faint); text-transform: none; letter-spacing: 0; }
   .field .hint:not(:empty) { margin-top: 4px; }
   .hint.warn { color: #a07617; font-weight: 600; background: var(--warn-soft); padding: 5px 8px; border-radius: 7px; }
   .linkish { color: var(--copper); font-weight: 700; text-decoration: underline; padding: 0 2px; font-size: inherit; }
@@ -659,7 +666,7 @@
    behind the figures already on screen.
    ========================================================================= */
 
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.5.0';
 const BCT_API_URL = 'https://script.google.com/macros/s/AKfycbxdCU4dK92I_Q5mlzhp9cEw_efeX5bVfkfLfqbNf_5eDpyj1RljUh0WqO-Y5-t3RhNZ/exec';
 const STOCK_API_URL = 'https://script.google.com/macros/s/AKfycbzs_aW0G-NvVvs-_Yk41d4esq1lkKVBTzQEQTrbbIKe7kQfoYdXD3cuhd6Wt2UQ6MU0/exec';
 const APP_URL = 'https://calgas.github.io/Batch-Card-Tracker/';
@@ -999,6 +1006,40 @@ function openBatches() { return S.D.batches.filter(b => info(b).open); }
 // batch total: the count changes from elements to capacitors along the way
 // (718 elements wound, 359 capacitors packed), which is not a loss.
 function yieldOf(good, rejected) { return good + rejected ? pct(good, good + rejected) : '—'; }
+
+/* ---------- elements and capacitors ----------
+   A capacitor is one or more wound elements (25 kVAr can: 3; 3×174 MFD box:
+   24), set as "elements per capacitor" when the batch is planned. Winding to
+   Short Clearing count elements (capacitors × elements per capacitor); from
+   Welding & Soldering on, capacitors (good elements ÷ elements per capacitor,
+   whole capacitors). A batch's Total_Qty is capacitors planned and Good_Qty
+   the capacitors it can still make. Batches opened before this have no
+   elements per capacitor and keep their counts as entered. */
+function hasPerCap(b) { return num(b && b.Elements_Per_Cap) >= 1; }
+function perCap(b) { return hasPerCap(b) ? Math.round(num(b.Elements_Per_Cap)) : 1; }
+function elementsToWind(b) { return num(b.Total_Qty) * perCap(b); }
+function unitOf(st, n) { const u = st && st.unit === 'capacitors' ? 'capacitor' : 'element'; return n === 1 ? u : u + 's'; }
+// Good and rejects for the yield, in elements: a rejected capacitor is its elements.
+function yieldParts(b) {
+  const g = num(b.Good_Qty);
+  if (!hasPerCap(b)) return [g, num(b.Reject_Qty)];
+  const n = perCap(b), step = num(b.Step), idx = step > 0 ? Math.floor((step - 1) / 2) : -1;
+  const atCaps = idx >= 0 && stages()[idx] && stages()[idx].unit === 'capacitors';
+  const good = atCaps ? g * n : (blankV(b.Good_Elements) ? g * n : num(b.Good_Elements));
+  const rej = blankV(b.Reject_Elements) ? num(b.Reject_Qty) : num(b.Reject_Elements) + num(b.Reject_Caps) * n;
+  return [good, rej];
+}
+function yieldOfBatch(b) { const x = yieldParts(b); return yieldOf(x[0], x[1]); }
+function yieldFrac(b) { const x = yieldParts(b); return x[0] + x[1] ? x[0] / (x[0] + x[1]) : ''; }
+function rejectText(b) {
+  if (!hasPerCap(b)) return fmtNum(b.Reject_Qty || 0);
+  const e = num(b.Reject_Elements), c = num(b.Reject_Caps);
+  return [e ? fmtNum(e) + ' el.' : '', c ? fmtNum(c) + ' cap' + (c === 1 ? '' : 's') : ''].filter(Boolean).join(' · ') || '0';
+}
+// "100 capacitors × 3 = 300 elements · Delta"
+function planText(b) {
+  return hasPerCap(b) ? fmtNum(b.Total_Qty) + ' capacitors × ' + perCap(b) + ' = ' + fmtNum(elementsToWind(b)) + ' elements' + (b.Connection ? ' · ' + b.Connection : '') : '';
+}
 
 /* ---------- media ---------- */
 function mediaMode() { return (S.D && S.D.settings && S.D.settings.mediaMode) || 'public'; }
@@ -1400,24 +1441,28 @@ function sugPanel() {
   document.body.appendChild(p);
   return (SUG.panel = p);
 }
+// data-new="Voltages" on a box: something typed that isn't in the list is
+// offered first, and is added to that list when the form is saved.
 function sugOpen(input, showAll) {
   if (input.readOnly || input.disabled) return;
-  const opts = sugOptions(input);
-  if (!opts.length) { sugClose(); return; }
+  const opts = sugOptions(input), joins = input.dataset.new, typed = input.value.trim();
+  if (!opts.length && !(joins && typed)) { sugClose(); return; }
   SUG.input = input;
-  const q = input.value.trim().toUpperCase();
+  const q = typed.toUpperCase();
   const exact = opts.findIndex(o => o.v.toUpperCase() === q);
   let list = opts;
   if (q && !showAll && exact < 0) {
     list = opts.filter(o => (o.v + ' ' + o.t).toUpperCase().indexOf(q) > -1);
     list.sort((a, b) => (a.v.toUpperCase().indexOf(q) === 0 ? 0 : 1) - (b.v.toUpperCase().indexOf(q) === 0 ? 0 : 1));
   }
-  SUG.items = list.slice(0, 400);
-  SUG.idx = exact > -1 && list === opts ? exact : (q && list.length ? 0 : -1);
+  let items = list.slice(0, 400);
+  if (joins && typed && exact < 0) items = [{ v: typed, t: 'New — added to ' + joins + ' when you save', isNew: true }].concat(items);
+  SUG.items = items;
+  SUG.idx = exact > -1 && list === opts ? exact : (q && items.length ? 0 : -1);
   const p = sugPanel();
   p.innerHTML = SUG.items.length
-    ? SUG.items.map((o, i) => `<div class="sug-it${i === SUG.idx ? ' on' : ''}" role="option" id="sugOpt${i}" data-i="${i}" aria-selected="${i === SUG.idx}"><b>${esc(o.v)}</b>${o.t ? `<small>${esc(o.t)}</small>` : ''}</div>`).join('')
-    : '<div class="sug-none">Nothing matches “' + esc(input.value.trim()) + '”.</div>';
+    ? SUG.items.map((o, i) => `<div class="sug-it${o.isNew ? ' sug-new' : ''}${i === SUG.idx ? ' on' : ''}" role="option" id="sugOpt${i}" data-i="${i}" aria-selected="${i === SUG.idx}"><b>${o.isNew ? '+ “' + esc(o.v) + '”' : esc(o.v)}</b>${o.t ? `<small>${esc(o.t)}</small>` : ''}</div>`).join('')
+    : '<div class="sug-none">Nothing matches “' + esc(typed) + '”.</div>';
   p.style.display = 'block';
   input.setAttribute('aria-expanded', 'true');
   sugPlace();
@@ -1764,17 +1809,17 @@ function renderOverview() {
   const now = new Date(), monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
   const doneMonth = B.filter(b => info(b).done && b.Done_At && b.Done_At >= monthStart);
   const done30 = B.filter(b => info(b).done && b.Done_At && b.Done_At >= Date.now() - 30 * DAY);
-  const rej30 = done30.reduce((s, b) => s + num(b.Reject_Qty), 0), good30 = done30.reduce((s, b) => s + num(b.Good_Qty), 0);
+  const y30 = done30.reduce((s, b) => { const x = yieldParts(b); return [s[0] + x[0], s[1] + x[1]]; }, [0, 0]), good30 = done30.reduce((s, b) => s + num(b.Good_Qty), 0);
   const wip = open.reduce((s, b) => s + num(b.Good_Qty), 0);
   const oldestPqa = pqa.slice().sort((a, b) => (a.Last_Activity || 0) - (b.Last_Activity || 0))[0];
 
   const kpis = '<div class="grid g-kpi">' +
-    kpi('Open batches', fmtNum(open.length), fmtNum(wip) + ' pieces in progress', 'batches', '', '#/batches', 'var(--copper-soft)') +
+    kpi('Open batches', fmtNum(open.length), fmtNum(wip) + ' capacitors in progress', 'batches', '', '#/batches', 'var(--copper-soft)') +
     kpi('Waiting for PQA', fmtNum(pqa.length), oldestPqa ? 'oldest ' + ago(oldestPqa.Last_Activity) : 'none waiting', 'pqa', pqa.length ? 'warn' : '', '#/pqa', 'var(--warn-soft)') +
     kpi('On PQA hold', fmtNum(hold.length), hold.length ? hold.slice(0, 2).map(b => b.Batch_No).join(', ') : 'none held', 'hold', hold.length ? 'alert' : '', '#/pqa', 'var(--bad-soft)') +
     kpi('No movement ' + S.D.settings.stuckHours + ' h+', fmtNum(stuck.length), stuck.length ? 'needs a push' : 'all moving', 'clock', stuck.length ? 'alert' : '', '#/batches?stuck', 'var(--bad-soft)') +
-    kpi('Completed this month', fmtNum(doneMonth.length), fmtNum(doneMonth.reduce((s, b) => s + num(b.Good_Qty), 0)) + ' good pieces', 'check', '', '#/batches', 'var(--ok-soft)') +
-    kpi('Yield, last 30 days', done30.length ? yieldOf(good30, rej30) : '—', done30.length ? fmtNum(rej30) + ' rejected · ' + fmtNum(good30) + ' good' : 'no batch completed', 'box', '', '#/batches', 'var(--azure-soft)') +
+    kpi('Completed this month', fmtNum(doneMonth.length), fmtNum(doneMonth.reduce((s, b) => s + num(b.Good_Qty), 0)) + ' good capacitors', 'check', '', '#/batches', 'var(--ok-soft)') +
+    kpi('Yield, last 30 days', done30.length ? yieldOf(y30[0], y30[1]) : '—', done30.length ? fmtNum(good30) + ' good capacitors · counted in elements' : 'no batch completed', 'box', '', '#/batches', 'var(--azure-soft)') +
     '</div>';
 
   const pipe = stages().map((st, i) => {
@@ -1836,7 +1881,7 @@ function renderOverview() {
     </div>
     <div class="grid g-3" style="margin-top:16px">
       <div class="card"><div class="card-head"><div><h3>Recent activity</h3><p>Cards recorded and signed</p></div></div><div class="rows" style="margin-top:10px">${evHtml}</div></div>
-      <div class="card"><div class="card-head"><div><h3>Rejects, last 30 days</h3><p>${fmtNum(totalRej)} pieces · by stage, then by reason</p></div></div>
+      <div class="card"><div class="card-head"><div><h3>Rejects, last 30 days</h3><p>${fmtNum(totalRej)} · elements up to Short Clearing, capacitors after · by stage, then by reason</p></div></div>
         <div style="padding:10px 0 4px">${totalRej ? bars(byStage.filter(x => x.v)) : '<div class="empty">No rejects in 30 days.</div>'}</div>
         ${byReason.length ? '<div style="border-top:1px solid var(--line-soft);padding:8px 0 12px">' + bars(byReason) + '</div>' : ''}</div>
     </div>`;
@@ -1887,10 +1932,10 @@ function renderBatches() {
   } else {
     const T = 'batches';
     const val = (b, k) => ({ batch: b.Batch_No, product: b.Product_Name || b.Part_Code, customer: b.Customer_Name, where: info(b).done ? 99 : info(b).idx, total: num(b.Total_Qty), good: num(b.Good_Qty),
-      yield: num(b.Good_Qty) + num(b.Reject_Qty) ? num(b.Good_Qty) / (num(b.Good_Qty) + num(b.Reject_Qty)) : '', started: new Date(b.Created_At).getTime() || '', last: new Date(b.Last_Activity).getTime() || '' })[k];
-    body = `<div class="card tbl-wrap"><table class="tbl"><thead><tr>${thSort(T, 'batch', 'Batch')}${thSort(T, 'product', 'Product')}${thSort(T, 'customer', 'Customer')}${thSort(T, 'where', 'Where')}${thSort(T, 'total', 'Total', 'num')}${thSort(T, 'good', 'Good', 'num')}${thSort(T, 'yield', 'Yield', 'num')}${thSort(T, 'started', 'Started')}${thSort(T, 'last', 'Last activity')}</tr></thead><tbody>` +
+      yield: yieldFrac(b), started: new Date(b.Created_At).getTime() || '', last: new Date(b.Last_Activity).getTime() || '' })[k];
+    body = `<div class="card tbl-wrap"><table class="tbl"><thead><tr>${thSort(T, 'batch', 'Batch')}${thSort(T, 'product', 'Product')}${thSort(T, 'customer', 'Customer')}${thSort(T, 'where', 'Where')}${thSort(T, 'total', 'Capacitors', 'num')}${thSort(T, 'good', 'Good', 'num')}${thSort(T, 'yield', 'Yield', 'num')}${thSort(T, 'started', 'Started')}${thSort(T, 'last', 'Last activity')}</tr></thead><tbody>` +
       sortRows(T, list, val).map(b => `<tr data-act="open-batch" data-b="${esc(b.Batch_No)}"><td><b class="mono">${esc(b.Batch_No)}</b></td><td>${esc(b.Product_Name || b.Part_Code)}<div class="faint mono" style="font-size:11px">${esc(b.Part_Code)}</div></td>
-        <td>${esc(b.Customer_Name || '')}</td><td>${statusBadge(b)}</td><td class="num">${fmtNum(b.Total_Qty)}</td><td class="num">${fmtNum(b.Good_Qty)}</td><td class="num">${yieldOf(num(b.Good_Qty), num(b.Reject_Qty))}</td>
+        <td>${esc(b.Customer_Name || '')}</td><td>${statusBadge(b)}</td><td class="num">${fmtNum(b.Total_Qty)}${hasPerCap(b) ? `<div class="faint" style="font-size:11px">× ${perCap(b)} el.</div>` : ''}</td><td class="num">${fmtNum(b.Good_Qty)}</td><td class="num">${yieldOfBatch(b)}</td>
         <td>${dt(b.Created_At, false)}</td><td>${ago(b.Last_Activity)}</td></tr>`).join('') + '</tbody></table></div>';
   }
   return `<div class="page-head"><div><p style="margin:0">${plural(list.length, 'batch', 'batches')} shown</p></div>
@@ -1938,7 +1983,8 @@ function stageCardHtml(b, st, i, c) {
   if (isLatest && !b.FG_TxnID && ((!signed(c) && (can.pqa || c.Recorded_By === S.D.me.username)) || can.del))
     acts.push(`<button class="btn btn-soft-bad btn-sm" data-act="send-back" data-b="${esc(b.Batch_No)}" data-s="${st.key}">${ico('undo')}${signed(c) ? 'Remove' : 'Send back'}</button>`);
   if (isLatest && signed(c) && can.edit && !inf.done) acts.push(`<button class="btn btn-ghost btn-sm" data-act="clear-pqa" data-b="${esc(b.Batch_No)}" data-s="${st.key}">Take back sign-off</button>`);
-  const q = `${reading('Total', fmtNum(c.Total_Qty), 'q')}${st.rejects ? reading('Rejected', fmtNum(c.Reject_Qty || 0), 'q ' + (num(c.Reject_Qty) ? 'bad' : '')) : ''}${reading('Good', fmtNum(c.Good_Qty), 'q good')}`;
+  const U = unitOf(st);
+  const q = `${reading('Total ' + U, fmtNum(c.Total_Qty), 'q')}${st.rejects ? reading('Rejected ' + U, fmtNum(c.Reject_Qty || 0), 'q ' + (num(c.Reject_Qty) ? 'bad' : '')) : ''}${reading('Good ' + U, fmtNum(c.Good_Qty), 'q good')}`;
   const fields = st.fields.map(f => reading(f.label, fieldValue(f, c[f.key]))).join('');
   const photos = st.photos.map((p, k) => c[p.key] && String(c[p.key]).indexOf('missing:') !== 0
     ? `<div class="photo" data-act="lightbox" data-mid="${esc(c[p.key])}" data-cap="${esc(b.Batch_No + ' · ' + st.name + ' · ' + p.label)}">${img(c[p.key], 520, '', p.label)}<span>${esc(p.label)}</span></div>`
@@ -1995,10 +2041,11 @@ function renderBatch(r) {
     : i.done ? `<div class="note" style="margin:0 20px 16px">${ico('box')} Passed Final Audit — waiting for Stores to receive it in <a href="${OD_URL}#/receive" target="_blank" rel="noopener">Orders &amp; Dispatch</a>.</div>` : '';
   return `<div class="card"><div class="bhead"><div><div class="b-no">${esc(b.Batch_No)} ${statusBadge(b)}</div><div class="b-prod">${esc(b.Product_Name || b.Part_Code)}</div>
       <div class="b-meta"><span>Part <b class="mono">${esc(b.Part_Code)}</b></span><span>Customer <b>${esc(b.Customer_Name || '—')}</b></span>${b.Order_No ? `<span>Order <b class="mono">${esc(b.Order_No)}</b></span>` : ''}${b.Rating ? `<span>Rating <b>${esc(b.Rating)}</b></span>` : ''}${b.Voltage ? `<span>Voltage <b>${esc(b.Voltage)}</b></span>` : ''}
+      ${hasPerCap(b) ? `<span>Plan <b>${fmtNum(b.Total_Qty)} caps × ${perCap(b)} el. = ${fmtNum(elementsToWind(b))} elements</b>${b.Connection ? ' · <b>' + esc(b.Connection) + '</b>' : ''}</span>` : ''}${b.Winding_MFD ? `<span>Winding MFD <b>${esc(b.Winding_MFD)}</b></span>` : ''}
       <span>Started <b>${dt(b.Created_At)}</b> by ${esc(nameOf(b.Created_By))}</span></div>${b.Remarks ? `<div class="note">${esc(b.Remarks)}</div>` : ''}</div>
       <div class="bactions">${acts.join('')}</div></div>
-    <div class="bstats"><div><small>Total</small><b>${fmtNum(b.Total_Qty)}</b></div><div><small>Good now</small><b style="color:var(--ok)">${fmtNum(b.Good_Qty)}</b></div><div><small>Rejected</small><b style="color:${num(b.Reject_Qty) ? 'var(--bad)' : 'inherit'}">${fmtNum(b.Reject_Qty || 0)}</b></div>
-      <div><small>Yield</small><b>${yieldOf(num(b.Good_Qty), num(b.Reject_Qty))}</b></div><div><small>${i.done ? 'Completed' : 'Last activity'}</small><b style="font-size:14px">${i.done ? dt(b.Done_At, false) : ago(b.Last_Activity)}</b></div></div>
+    <div class="bstats"><div><small>${hasPerCap(b) ? 'Capacitors planned' : 'Total'}</small><b>${fmtNum(b.Total_Qty)}</b></div><div><small>${hasPerCap(b) ? 'Good capacitors now' : 'Good now'}</small><b style="color:var(--ok)">${fmtNum(b.Good_Qty)}${hasPerCap(b) && !blankV(b.Good_Elements) ? ` <span style="font-size:12px;font-weight:500;color:var(--ink-soft)">from ${fmtNum(b.Good_Elements)} el.</span>` : ''}</b></div><div><small>Rejected</small><b style="color:${num(b.Reject_Qty) ? 'var(--bad)' : 'inherit'}">${esc(rejectText(b))}</b></div>
+      <div><small>Yield</small><b>${yieldOfBatch(b)}</b></div><div><small>${i.done ? 'Completed' : 'Last activity'}</small><b style="font-size:14px">${i.done ? dt(b.Done_At, false) : ago(b.Last_Activity)}</b></div></div>
     <div style="border-top:1px solid var(--line-soft)"><div class="stepper">${stepper}</div></div>${holdNote}${fgNote}</div>
     ${cards}
     <div style="margin-top:16px;text-align:center"><button class="btn btn-ghost btn-sm" data-act="history" data-b="${esc(b.Batch_No)}">${ico('clock')}Show the full history</button><div id="historyBox"></div></div>`;
@@ -2032,7 +2079,7 @@ function renderPqa() {
     const pic = c && (c.Photo_1 || c.Photo_2);
     return `<div class="row" style="cursor:default">${pic ? img(pic, 160, 'thumb', '') : batchThumb(b)}
       <div class="r-main"><a href="#/batch/${esc(b.Batch_No)}/${i.stage.key}" style="color:inherit;text-decoration:none"><b class="mono">${esc(b.Batch_No)}</b></a> <span class="badge b-info">${esc(i.stage.name)}</span>
-        <small>${esc(b.Product_Name || b.Part_Code)} · ${c ? 'good ' + fmtNum(c.Good_Qty) + ' of ' + fmtNum(c.Total_Qty) : ''}${key ? ' · ' + esc(key) : ''}</small>
+        <small>${esc(b.Product_Name || b.Part_Code)} · ${c ? 'good ' + fmtNum(c.Good_Qty) + ' of ' + fmtNum(c.Total_Qty) + ' ' + unitOf(i.stage) : ''}${key ? ' · ' + esc(key) : ''}</small>
         <small>Recorded by ${esc(nameOf(c && c.Recorded_By))} · ${ago(c && c.Recorded_At)}</small></div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end"><a class="btn btn-ghost btn-sm" href="#/batch/${esc(b.Batch_No)}/${i.stage.key}">Review</a>${can.pqa ? `<button class="btn btn-ok btn-sm" data-act="pqa-sign" data-b="${esc(b.Batch_No)}" data-s="${i.stage.key}">${ico('pqa')}Sign</button>` : ''}</div></div>`;
   };
@@ -2086,16 +2133,16 @@ function renderStage(r) {
   let body;
   if (tab === 'record') {
     body = toRecord.length ? '<div class="card"><div class="rows">' + toRecord.map(b => `<div class="row" style="cursor:default">${batchThumb(b)}<div class="r-main"><a href="#/batch/${esc(b.Batch_No)}" style="color:inherit;text-decoration:none"><b class="mono">${esc(b.Batch_No)}</b></a> ${info(b).hold ? '<span class="badge b-bad">On hold</span>' : ''}
-        <small>${esc(b.Product_Name || b.Part_Code)} · ${esc(b.Customer_Name || '')} · ${fmtNum(b.Good_Qty)} pieces</small><small>${i === 0 ? 'Opened ' + ago(b.Created_At) : 'Ready since ' + ago(b.Last_Activity)}</small></div>
+        <small>${esc(b.Product_Name || b.Part_Code)} · ${esc(b.Customer_Name || '')} · ${hasPerCap(b) && st.unit === 'elements' ? fmtNum(blankV(b.Good_Elements) ? elementsToWind(b) : b.Good_Elements) + ' elements' : fmtNum(b.Good_Qty) + (hasPerCap(b) ? ' capacitors' : ' pieces')}</small><small>${i === 0 ? 'Opened ' + ago(b.Created_At) : 'Ready since ' + ago(b.Last_Activity)}</small></div>
         ${can.stages[st.key] && !info(b).hold ? `<button class="btn btn-primary btn-sm" data-act="record" data-b="${esc(b.Batch_No)}" data-s="${st.key}">${ico('plus')}Record</button>` : ''}</div>`).join('') + '</div></div>'
       : toRecordAll.length ? '<div class="card empty">Nothing here matches the search or filters.</div>' : '<div class="card empty"><div class="big">✓</div>Nothing to record at ' + esc(st.name) + '.</div>';
   } else if (tab === 'pqa') {
-    body = waiting.length ? '<div class="card"><div class="rows">' + waiting.map(b => { const c = cardOf(b.Batch_No, st.key); return `<div class="row" style="cursor:default">${c && c.Photo_1 ? img(c.Photo_1, 160, 'thumb') : batchThumb(b)}<div class="r-main"><b class="mono">${esc(b.Batch_No)}</b><small>${esc(b.Product_Name || b.Part_Code)} · good ${fmtNum(c && c.Good_Qty)}</small><small>Recorded by ${esc(nameOf(c && c.Recorded_By))} · ${ago(c && c.Recorded_At)}</small></div>
+    body = waiting.length ? '<div class="card"><div class="rows">' + waiting.map(b => { const c = cardOf(b.Batch_No, st.key); return `<div class="row" style="cursor:default">${c && c.Photo_1 ? img(c.Photo_1, 160, 'thumb') : batchThumb(b)}<div class="r-main"><b class="mono">${esc(b.Batch_No)}</b><small>${esc(b.Product_Name || b.Part_Code)} · good ${fmtNum(c && c.Good_Qty)} ${unitOf(st)}</small><small>Recorded by ${esc(nameOf(c && c.Recorded_By))} · ${ago(c && c.Recorded_At)}</small></div>
         <a class="btn btn-ghost btn-sm" href="#/batch/${esc(b.Batch_No)}/${st.key}">Review</a>${can.pqa && !info(b).hold ? `<button class="btn btn-ok btn-sm" data-act="pqa-sign" data-b="${esc(b.Batch_No)}" data-s="${st.key}">Sign</button>` : ''}</div>`; }).join('') + '</div></div>'
       : waitingAll.length ? '<div class="card empty">Nothing here matches the search or filters.</div>' : '<div class="card empty">Nothing waiting for PQA here.</div>';
   } else {
     const cols = st.fields.filter(f => f.type !== 'auto' || st.key === 'WIN').slice(0, 9);
-    body = recorded.length ? `<div class="card tbl-wrap"><table class="tbl"><thead><tr>${thSort(T, 'batch', 'Batch')}${thSort(T, 'cust', 'Customer')}${thSort(T, 'at', 'Recorded')}${thSort(T, 'total', 'Total', 'num')}${st.rejects ? thSort(T, 'rej', 'Rej.', 'num') : ''}${thSort(T, 'good', 'Good', 'num')}${thSort(T, 'op', 'Operator')}${cols.map(f => thSort(T, f.key, f.label)).join('')}${thSort(T, 'pqa', 'PQA')}</tr></thead><tbody>` +
+    body = recorded.length ? `<div class="card tbl-wrap"><table class="tbl"><thead><tr>${thSort(T, 'batch', 'Batch')}${thSort(T, 'cust', 'Customer')}${thSort(T, 'at', 'Recorded')}${thSort(T, 'total', st.unit === 'capacitors' ? 'Caps' : 'Elements', 'num')}${st.rejects ? thSort(T, 'rej', 'Rej.', 'num') : ''}${thSort(T, 'good', 'Good', 'num')}${thSort(T, 'op', 'Operator')}${cols.map(f => thSort(T, f.key, f.label)).join('')}${thSort(T, 'pqa', 'PQA')}</tr></thead><tbody>` +
       recorded.slice(0, 500).map(c => `<tr data-act="open-batch" data-b="${esc(c.Batch_No)}"><td><b class="mono">${esc(c.Batch_No)}</b><div class="faint mono" style="font-size:11px">${esc(bOf(c.Batch_No).Part_Code || '')}</div></td><td>${esc(bOf(c.Batch_No).Customer_Name || '')}</td><td>${dt(c.Recorded_At)}</td><td class="num">${fmtNum(c.Total_Qty)}</td>${st.rejects ? `<td class="num" style="${num(c.Reject_Qty) ? 'color:var(--bad)' : ''}">${fmtNum(c.Reject_Qty || 0)}</td>` : ''}<td class="num">${fmtNum(c.Good_Qty)}</td><td>${esc(c.Operator)}</td>
         ${cols.map(f => `<td>${esc(fieldValue(f, c[f.key]))}</td>`).join('')}<td>${signed(c) ? '<span class="badge b-ok">' + esc(nameOf(c.PQA_By)) + '</span>' : '<span class="badge b-warn">waiting</span>'}</td></tr>`).join('') + '</tbody></table></div>' +
       (recorded.length > 500 ? `<p class="faint" style="font-size:12px;margin-top:8px">Showing the first 500 of ${fmtNum(recorded.length)}. Search or filter to narrow it.</p>` : '')
@@ -2284,34 +2331,66 @@ function openBatchForm(batch, pre) {
   pre = pre || {};
   const products = S.D.products.slice().sort((a, b) => String(a.Part_Code).localeCompare(String(b.Part_Code)));
   const customers = S.D.lists.Customers || [];
-  const m = openModal(modalHead(edit ? 'Edit batch' : 'New batch', edit ? batch.Batch_No : 'Open a new batch card', edit ? '' : 'The batch number is given when you save.') +
+  // A batch opened before elements per capacitor: its quantity stays as entered unless the elements are set.
+  const legacy = edit && !hasPerCap(batch);
+  const dl = (id, arr) => `<datalist id="${id}">${arr.map(o => `<option value="${esc(o)}">`).join('')}</datalist>`;
+  const m = openModal(modalHead(edit ? 'Edit batch' : 'New batch', edit ? batch.Batch_No : 'Plan a new batch card', edit ? '' : 'The batch number is given when you save.') +
     `<div class="modal-body"><div class="form-grid">
       <div class="field full"><label>Part code <span class="req">*</span></label><input id="bfPart" list="bfParts" autocomplete="off" value="${esc(edit ? batch.Part_Code : pre.part || '')}" placeholder="Type to search products">
         <datalist id="bfParts">${products.map(p => `<option value="${esc(p.Part_Code)}">${esc(p.Product_Name || '')}</option>`).join('')}</datalist><div class="hint" id="bfProd"></div></div>
       <div class="field full"><label for="bfOrder">For order</label><select id="bfOrder"></select><div class="hint" id="bfOrderHint"></div></div>
-      <div class="field"><label for="bfCust">Customer<span class="af hidden" id="bfCustTag"></span></label><select id="bfCust"><option value="">No customer</option>${customers.map(c => `<option ${edit && batch.Customer_Name === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></div>
-      <div class="field"><label>Total quantity <span class="req">*</span></label><input id="bfQty" type="number" inputmode="numeric" min="1" step="1" value="${esc(edit ? batch.Total_Qty : '')}"><div class="hint" id="bfQtyHint"></div></div>
+      <div class="field"><label for="bfCust">Customer<span class="af hidden" id="bfCustTag"></span></label><input id="bfCust" list="bfCustL" data-new="Customers" maxlength="120" value="${esc(edit ? batch.Customer_Name || '' : '')}" placeholder="No customer">${dl('bfCustL', customers)}</div>
+      <div class="field"><label for="bfQty">${legacy ? 'Total quantity' : 'Quantity (capacitors)'} <span class="req">*</span></label><input id="bfQty" type="number" inputmode="numeric" min="1" step="1" value="${esc(edit ? batch.Total_Qty : '')}"><div class="hint" id="bfQtyHint"></div></div>
+      <div class="field"><label for="bfMfd">Winding element MFD<span class="af hidden" id="bfMfdTag">Product</span></label><input id="bfMfd" list="bfMfdL" data-new="Winding MFD" maxlength="40" value="${esc(edit ? batch.Winding_MFD || '' : '')}" placeholder="Select or type">${dl('bfMfdL', S.D.lists['Winding MFD'] || [])}</div>
+      <div class="field"><label for="bfPer">Elements per capacitor${legacy ? '' : ' <span class="req">*</span>'}<span class="af hidden" id="bfPerTag">Product</span></label><input id="bfPer" type="number" inputmode="numeric" min="1" max="999" step="1" value="${esc(edit && hasPerCap(batch) ? perCap(batch) : '')}" placeholder="${legacy ? 'Not set for this batch' : 'e.g. 3'}"></div>
+      <div class="field"><label for="bfConn">Connection<span class="af hidden" id="bfConnTag">Product</span></label><input id="bfConn" list="bfConnL" data-new="Connections" maxlength="60" value="${esc(edit ? batch.Connection || '' : '')}" placeholder="Select connection">${dl('bfConnL', S.D.lists.Connections || [])}</div>
+      <div class="field full"><div class="plan-line" id="bfPlan"></div></div>
       ${can.backdate ? `<div class="field"><label>Batch date</label><input id="bfDate" type="datetime-local"><div class="hint">Leave empty for now. Only for paperwork entered late.</div></div>` : ''}
       <div class="field full"><label>Remarks</label><textarea id="bfRemarks" maxlength="1000">${esc(edit ? batch.Remarks : '')}</textarea></div>
       ${edit && num(batch.Step) > 0 ? '<div class="field full"><label>Why the change <span class="req">*</span></label><input id="bfReason" maxlength="300"></div>' : ''}
     </div><div class="form-error" id="bfErr"></div></div>
     <div class="modal-foot"><button class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-primary" id="bfSave">${edit ? 'Save changes' : 'Create batch'}</button></div>`);
-  const findProd = () => products.find(x => String(x.Part_Code).toUpperCase() === $('#bfPart', m.el).value.trim().toUpperCase());
+  const $m = (q) => $(q, m.el);
+  const findProd = () => products.find(x => String(x.Part_Code).toUpperCase() === $m('#bfPart').value.trim().toUpperCase());
   let custAuto = !edit;
-  $('#bfCust', m.el).addEventListener('change', () => { custAuto = false; $('#bfCustTag', m.el).classList.add('hidden'); });
+  $m('#bfCust').addEventListener('input', () => { custAuto = false; $m('#bfCustTag').classList.add('hidden'); });
+  // Winding MFD, elements per capacitor and connection come from the product until changed by hand.
+  const fromProd = { bfMfd: ['Winding_MFD', !edit], bfPer: ['Elements_Per_Cap', !edit], bfConn: ['Connection', !edit] };
+  Object.keys(fromProd).forEach(id => $m('#' + id).addEventListener('input', () => { fromProd[id][1] = false; $m('#' + id + 'Tag').classList.add('hidden'); plan(); }));
+  const fillFromProd = (p) => Object.keys(fromProd).forEach(id => {
+    if (!fromProd[id][1]) return;
+    const v = p && !blankV(p[fromProd[id][0]]) ? String(p[fromProd[id][0]]) : (id === 'bfPer' && p ? '1' : '');
+    $m('#' + id).value = v;
+    $m('#' + id + 'Tag').textContent = p && !blankV(p[fromProd[id][0]]) ? 'Product' : '';
+    $m('#' + id + 'Tag').classList.toggle('hidden', !(p && !blankV(p[fromProd[id][0]])));
+  });
+  // "100 capacitors × 3 = 300 elements to wind"
+  const plan = () => {
+    const q = num($m('#bfQty').value), raw = $m('#bfPer').value.trim(), n = num(raw), box = $m('#bfPlan');
+    box.classList.remove('warn');
+    if (legacy && !raw) { box.innerHTML = 'Elements per capacitor isn’t set for this batch: its quantities stay as they were entered.'; return; }
+    if (!(n >= 1) || Math.round(n) !== n) { box.innerHTML = 'Enter how many wound elements make one capacitor (1 for a single-element capacitor).'; box.classList.toggle('warn', !!raw); return; }
+    if (!(q > 0)) { box.innerHTML = 'Each capacitor is <b>' + n + '</b> element' + (n === 1 ? '' : 's') + (($m('#bfConn').value.trim()) ? ', connected <b>' + esc($m('#bfConn').value.trim()) + '</b>' : '') + '.'; return; }
+    box.innerHTML = '<b>' + fmtNum(q) + '</b> capacitors × <b>' + n + '</b> = <b>' + fmtNum(q * n) + '</b> elements to wind. Winding to Short Clearing count elements; from Welding &amp; Soldering on, capacitors.' +
+      (legacy ? '<br>Before this the batch counted ' + fmtNum(q) + ' as entered. If that was the element count, enter ' + fmtNum(Math.round(q / n)) + ' capacitors.' : '');
+    box.classList.toggle('warn', legacy);
+  };
+  $m('#bfQty').addEventListener('input', plan);
   const showProd = () => {
-    const p = findProd(), typed = $('#bfPart', m.el).value.trim();
-    $('#bfProd', m.el).textContent = p ? [p.Product_Name, p.Rating, p.Voltage].filter(Boolean).join(' · ') : (typed ? 'Not in Products: pick a part code from the list.' : '');
-    $('#bfProd', m.el).classList.toggle('warn', !p && !!typed);
+    const p = findProd(), typed = $m('#bfPart').value.trim();
+    $m('#bfProd').textContent = p ? [p.Product_Name, p.Rating, p.Voltage].filter(Boolean).join(' · ') : (typed ? 'Not in Products: pick a part code from the list.' : '');
+    $m('#bfProd').classList.toggle('warn', !p && !!typed);
+    fillFromProd(p);
     // The last batch of this product: its customer is filled in, its quantity shown.
     const last = p ? S.D.batches.filter(x => String(x.Part_Code).toUpperCase() === String(p.Part_Code).toUpperCase() && x.Status !== 'Void').sort((a, b) => new Date(b.Created_At) - new Date(a.Created_At))[0] : null;
-    $('#bfQtyHint', m.el).textContent = last ? 'Last batch of this product: ' + fmtNum(last.Total_Qty) + ' (' + last.Batch_No + ')' : '';
+    $m('#bfQtyHint').textContent = last ? 'Last batch of this product: ' + fmtNum(last.Total_Qty) + (hasPerCap(last) ? ' capacitors' : '') + ' (' + last.Batch_No + ')' : '';
     if (custAuto) {
-      const c = last && customers.indexOf(last.Customer_Name) > -1 ? last.Customer_Name : '';
-      $('#bfCust', m.el).value = c;
-      $('#bfCustTag', m.el).textContent = c ? 'As ' + last.Batch_No : '';
-      $('#bfCustTag', m.el).classList.toggle('hidden', !c);
+      const c = last && last.Customer_Name ? last.Customer_Name : '';
+      $m('#bfCust').value = c;
+      $m('#bfCustTag').textContent = c ? 'As ' + last.Batch_No : '';
+      $m('#bfCustTag').classList.toggle('hidden', !c);
     }
+    plan();
   };
   // Open order lines for this product (from Orders & Dispatch). Picking one
   // fills the customer and what is still to be put into batches.
@@ -2319,42 +2398,49 @@ function openBatchForm(batch, pre) {
   const fgOf = (p) => String(p.Stock_FG_Code || p.Part_Code || '').toUpperCase();
   const inBatches = (id) => S.D.batches.filter(x => x.Order_Line === id && x.Status !== 'Void' && (!edit || x.Batch_No !== batch.Batch_No)).reduce((t, x) => t + num(x.Total_Qty), 0);
   const fillOrders = () => {
-    const p = findProd(), sel = $('#bfOrder', m.el), cur = sel.value || (edit ? batch.Order_Line : pre.line) || '';
+    const p = findProd(), sel = $m('#bfOrder'), cur = sel.value || (edit ? batch.Order_Line : pre.line) || '';
     const mine = p ? lines.filter(l => [fgOf(p), String(p.Part_Code).toUpperCase()].indexOf(String(l.fgCode).toUpperCase()) > -1) : [];
     let opts = '<option value="">For stock (no order)</option>' + mine.map(l => `<option value="${esc(l.lineId)}">${esc(l.orderNo)} · ${esc(l.customer)} · ${fmtNum(l.qty)}${l.requiredBy ? ' by ' + dt(l.requiredBy).split(',')[0] : ''}${l.priority === 'Urgent' ? ' · URGENT' : ''}</option>`).join('');
     if (cur && !mine.some(l => l.lineId === cur) && edit && batch.Order_Line === cur) opts += `<option value="${esc(cur)}">${esc(batch.Order_No)} (closed)</option>`;
     sel.innerHTML = opts; sel.value = mine.some(l => l.lineId === cur) || (edit && batch.Order_Line === cur) ? cur : '';
     sel.disabled = !mine.length && !sel.value;
-    $('#bfOrderHint', m.el).textContent = !S.D.orders || !S.D.orders.linked ? 'Orders & Dispatch can’t be reached just now.' : p && !mine.length ? 'No open orders for this product.' : '';
+    $m('#bfOrderHint').textContent = !S.D.orders || !S.D.orders.linked ? 'Orders & Dispatch can’t be reached just now.' : p && !mine.length ? 'No open orders for this product.' : '';
   };
   const pickOrder = (fill) => {
-    const l = lines.find(x => x.lineId === $('#bfOrder', m.el).value);
+    const l = lines.find(x => x.lineId === $m('#bfOrder').value);
     if (!l) return;
     const done = inBatches(l.lineId), left = Math.max(0, l.qty - done);
-    $('#bfOrderHint', m.el).textContent = fmtNum(l.qty) + ' ordered · ' + fmtNum(done) + ' already in batches · ' + fmtNum(left) + ' to go.';
+    $m('#bfOrderHint').textContent = fmtNum(l.qty) + ' capacitors ordered · ' + fmtNum(done) + ' already in batches · ' + fmtNum(left) + ' to go.';
     if (!fill) return;
-    const cs = $('#bfCust', m.el);
-    if (l.customer && ![...cs.options].some(o => o.value === l.customer)) cs.insertAdjacentHTML('beforeend', `<option>${esc(l.customer)}</option>`);
-    if (l.customer) { cs.value = l.customer; custAuto = false; $('#bfCustTag', m.el).textContent = 'Order'; $('#bfCustTag', m.el).classList.remove('hidden'); }
-    if (!$('#bfQty', m.el).value && left > 0) $('#bfQty', m.el).value = left;
+    if (l.customer) { $m('#bfCust').value = l.customer; custAuto = false; $m('#bfCustTag').textContent = 'Order'; $m('#bfCustTag').classList.remove('hidden'); }
+    if (!$m('#bfQty').value && left > 0) $m('#bfQty').value = left;
+    plan();
   };
-  $('#bfOrder', m.el).addEventListener('change', () => pickOrder(true));
-  $('#bfPart', m.el).addEventListener('input', () => { showProd(); fillOrders(); }); showProd(); fillOrders(); pickOrder(!edit && !!pre.line);
-  setTimeout(() => $('#bfPart', m.el).focus(), 40);
+  $m('#bfOrder').addEventListener('change', () => pickOrder(true));
+  $m('#bfPart').addEventListener('input', () => { showProd(); fillOrders(); }); showProd(); fillOrders(); pickOrder(!edit && !!pre.line);
+  setTimeout(() => $m('#bfPart').focus(), 40);
   const txn = uuid();
-  $('#bfSave', m.el).addEventListener('click', async (e) => {
-    const err = $('#bfErr', m.el); err.textContent = '';
-    const p = { partCode: $('#bfPart', m.el).value.trim(), customer: $('#bfCust', m.el).value, totalQty: $('#bfQty', m.el).value, remarks: $('#bfRemarks', m.el).value, orderLine: $('#bfOrder', m.el).value };
+  $m('#bfSave').addEventListener('click', async (e) => {
+    const err = $m('#bfErr'); err.textContent = '';
+    const qty = $m('#bfQty').value, perRaw = $m('#bfPer').value.trim();
+    const p = { partCode: $m('#bfPart').value.trim(), customer: $m('#bfCust').value.trim(), remarks: $m('#bfRemarks').value, orderLine: $m('#bfOrder').value,
+                connection: $m('#bfConn').value.trim(), windingMfd: $m('#bfMfd').value.trim() };
     if (edit && (p.orderLine || '') === (batch.Order_Line || '')) delete p.orderLine;
     const prod = findProd();
     if (!prod) { err.textContent = p.partCode ? p.partCode + ' isn’t in Products. Pick a part code from the list, or add the product under Dropdowns → Products.' : 'Choose the part code.'; return; }
     p.partCode = prod.Part_Code;
-    if (!(num(p.totalQty) > 0) || Math.round(num(p.totalQty)) !== num(p.totalQty)) { err.textContent = 'Total quantity must be a whole number above 0.'; return; }
-    if ($('#bfDate', m.el) && $('#bfDate', m.el).value) p.createdAt = new Date($('#bfDate', m.el).value).toISOString();
+    if (!(num(qty) > 0) || Math.round(num(qty)) !== num(qty)) { err.textContent = legacy ? 'Total quantity must be a whole number above 0.' : 'Quantity must be a whole number of capacitors above 0.'; return; }
+    if (legacy && !perRaw) { p.totalQty = qty; delete p.connection; delete p.windingMfd; }
+    else {
+      const n = num(perRaw);
+      if (!perRaw || !(n >= 1) || Math.round(n) !== n || n > 999) { err.textContent = 'No. of elements per capacitor must be a whole number from 1 to 999.'; return; }
+      p.capQty = qty; p.elementsPerCap = n;
+    }
+    if ($m('#bfDate') && $m('#bfDate').value) p.createdAt = new Date($m('#bfDate').value).toISOString();
     const done = btnBusy(e.currentTarget);
     try {
       let d;
-      if (edit) { p.batchNo = batch.Batch_No; if ($('#bfReason', m.el)) p.reason = $('#bfReason', m.el).value; d = await api('updateBatch', p); }
+      if (edit) { p.batchNo = batch.Batch_No; if ($m('#bfReason')) p.reason = $m('#bfReason').value; d = await api('updateBatch', p); }
       else { p.clientTxnId = txn; d = await api('createBatch', p); }
       m.close(); applyResult(d);
       toast(edit ? 'Saved.' : d.batch.Batch_No + ' created.', 'ok');
@@ -2383,14 +2469,14 @@ function fieldInput(f, value, ctx) {
   const lab = `<label for="${id}">${esc(f.label)}${f.required ? ' <span class="req">*</span>' : ''}${tag}</label>`;
   const hint = `<div class="hint" data-hint="${f.key}">${esc(ctx.hint || '')}</div>`;
   if (f.type === 'auto') return `<div class="field">${lab.replace('<label', '<label data-auto="1"')}<div class="auto" id="${id}">${esc(v) || '—'}</div></div>`;
+  // Drop-downs: pick from the list or type; something new is added to the list
+  // on save. A near miss ("Viran" for "Viren") is asked about before saving.
   if (f.type === 'film') {
-    return `<div class="field">${lab}<select id="${id}" data-key="${f.key}" class="${af}">${blankOption(f.label, f.required)}${S.D.films.map(x => `<option ${String(x.Film) === String(v) ? 'selected' : ''}>${esc(x.Film)}</option>`).join('')}</select></div>`;
+    return `<div class="field">${lab}<input id="${id}" data-key="${f.key}" class="${af} mono" list="${id}_l" data-new="Films" value="${esc(v)}" maxlength="60" autocapitalize="characters" placeholder="Select or type"><datalist id="${id}_l">${S.D.films.map(x => `<option value="${esc(x.Film)}">${esc([x.Film_Type, x.Micron ? x.Micron + ' µ' : ''].filter(Boolean).join(' · '))}</option>`).join('')}</datalist>${hint}</div>`;
   }
   if (f.type === 'list') {
-    // A list is picked from, never typed: typing is how "Viran" and "Viren" both end up in the records.
     const opts = mergeOptions(S.D.lists[f.list] || [], ctx.options || [], v ? [String(v)] : []);
-    return `<div class="field">${lab}<select id="${id}" data-key="${f.key}" data-pick="1" class="${af}">${blankOption(f.label, f.required)}${opts.map(o => `<option ${o === String(v) ? 'selected' : ''}>${esc(o)}</option>`).join('')}<option value="__other">Other…</option></select>
-      <input id="${id}_o" class="hidden" maxlength="80" placeholder="Type the new ${esc(f.label.toLowerCase())}" style="margin-top:6px">${hint}</div>`;
+    return `<div class="field">${lab}<input id="${id}" data-key="${f.key}" class="${af}" list="${id}_l" data-new="${esc(f.list)}" value="${esc(v)}" maxlength="120" placeholder="${f.required ? 'Select or type' : 'None'}"><datalist id="${id}_l">${opts.map(o => `<option value="${esc(o)}">`).join('')}</datalist>${hint}</div>`;
   }
   if (f.type === 'enum') {
     return `<div class="field">${lab}<div class="chips${af}" data-key="${f.key}" data-enum="1">${f.options.map(o => `<button type="button" class="chip ${o === v ? 'on' : ''}" data-v="${esc(o)}">${esc(o)}</button>`).join('')}</div></div>`;
@@ -2470,7 +2556,17 @@ async function openCardForm(batchNo, stageKey, editing) {
   };
   const filled = {};
   st.fields.forEach(f => { filled[f.key] = fillOf(f); });
-  const total = existing ? existing.Total_Qty : draft && draft.totalQty !== undefined ? draft.totalQty : prev ? num(prev.Good_Qty !== '' ? prev.Good_Qty : prev.Total_Qty) : num(b.Total_Qty);
+  // Elements up to Short Clearing, capacitors after: at Welding & Soldering the
+  // good elements become whole capacitors (297 ÷ 3 = 99).
+  const n = perCap(b), conv = hasPerCap(b) && prevSt && prevSt.unit === 'elements' && st.unit === 'capacitors';
+  const prevGoodRaw = prev ? num(prev.Good_Qty !== '' ? prev.Good_Qty : prev.Total_Qty) : null;
+  const prevGood = prevGoodRaw === null ? null : conv ? Math.floor(prevGoodRaw / n) : prevGoodRaw;
+  const total = existing ? existing.Total_Qty : draft && draft.totalQty !== undefined ? draft.totalQty : prev ? prevGood : elementsToWind(b);
+  const totalSrc = prev ? (conv ? fmtNum(prevGoodRaw) + ' ÷ ' + n : 'Good from ' + prevSt.short) : hasPerCap(b) ? fmtNum(b.Total_Qty) + ' × ' + n : 'Batch total';
+  const leftover = conv ? prevGoodRaw - prevGood * n : 0;
+  const convNote = conv ? fmtNum(prevGoodRaw) + ' good elements from ' + prevSt.name + ' ÷ ' + n + ' per capacitor = ' + fmtNum(prevGood) + ' capacitors' + (leftover ? ' (' + plural(leftover, 'element') + ' left over)' : '') + '.'
+    : st.no === 1 && hasPerCap(b) ? planText(b) + '.' : '';
+  const U = unitOf(st);
   const media = Object.assign({}, existing ? { Photo_1: existing.Photo_1, Photo_2: existing.Photo_2 } : {}, draft && draft.media || {});
   const reasonsList = S.D.lists['Reject Reasons'] || [];
   const curReasons = reasonSplit(existing ? existing.Reject_Reason : draft && draft.rejectReason);
@@ -2486,24 +2582,23 @@ async function openCardForm(batchNo, stageKey, editing) {
     else if (S.D.me && S.D.me.name) { supName = S.D.me.name; supSrc = 'You'; }
   }
   const supNames = mergeOptions(S.D.me && S.D.me.name ? [S.D.me.name] : [], distinctPast(stages().map(x => x.key), 'Sup_Signed_By'));
-  const prevGood = prev ? num(prev.Good_Qty !== '' ? prev.Good_Qty : prev.Total_Qty) : null;
   const allOk = st.fields.filter(f => f.type === 'enum' && f.options.indexOf('OK') > -1);
   const signedCard = existing && signed(existing);
   const m = openModal(modalHead(editing ? 'Edit · Stage ' + st.no : 'Record · Stage ' + st.no, st.name + ' — ' + b.Batch_No,
-      esc(b.Product_Name || b.Part_Code) + ' · ' + esc(b.Customer_Name || '') + (prev ? ' · ' + fmtNum(prev.Good_Qty) + ' good from ' + esc(prevSt.name) : '')) +
+      esc(b.Product_Name || b.Part_Code) + ' · ' + esc(b.Customer_Name || '') + (prev ? ' · ' + fmtNum(prevGoodRaw) + ' good ' + unitOf(prevSt) + ' from ' + esc(prevSt.name) : '')) +
     `<div class="modal-body">${draft ? '<div class="note">Your unsaved entry was kept on this phone and is filled in below.</div>' : ''}
-      <div class="fsec">Quantity</div>
-      <div class="qty-row"><div class="field"><label>Total <span class="req">*</span>${!existing && !(draft && draft.totalQty !== undefined) ? `<span class="af">${prev ? 'Good from ' + esc(prevSt.short) : 'Batch total'}</span>` : ''}</label><input id="cfTotal" type="number" inputmode="numeric" min="1" step="1" value="${esc(total)}"></div>
-        ${st.rejects ? `<div class="field"><label>Rejected</label><input id="cfReject" type="number" inputmode="numeric" min="0" step="1" value="${esc(existing ? existing.Reject_Qty : draft && draft.rejectQty || 0)}"></div>` : '<div></div>'}
-        <div class="field"><label>Good</label><div class="good-box" id="cfGood">0</div></div></div>
+      <div class="fsec">Quantity · ${esc(U)}</div>
+      ${convNote ? `<div class="qty-note">${esc(convNote)}</div>` : ''}
+      <div class="qty-row"><div class="field"><label>Total ${esc(U)} <span class="req">*</span>${!existing && !(draft && draft.totalQty !== undefined) ? `<span class="af">${esc(totalSrc)}</span>` : ''}</label><input id="cfTotal" type="number" inputmode="numeric" min="1" step="1" value="${esc(total)}"></div>
+        ${st.rejects ? `<div class="field"><label>Rejected ${esc(U)}</label><input id="cfReject" type="number" inputmode="numeric" min="0" step="1" value="${esc(existing ? existing.Reject_Qty : draft && draft.rejectQty || 0)}"></div>` : '<div></div>'}
+        <div class="field"><label>Good ${esc(U)}</label><div class="good-box" id="cfGood">0</div></div></div>
       ${st.rejects ? `<div class="field hidden" id="cfReasonWrap"><label>Reject reason <span class="req">*</span></label><div class="chips" id="cfReasons">${reasonsList.map(r => `<button type="button" class="chip ${curReasons.indexOf(r) > -1 ? 'on' : ''}" data-v="${esc(r)}">${esc(r)}</button>`).join('')}</div>
-        <input id="cfReasonOther" placeholder="Other reason" value="${esc(curReasons.filter(r => reasonsList.indexOf(r) === -1).join('; '))}" style="margin-top:6px"></div>` : ''}
+        <input id="cfReasonOther" placeholder="Other reason (added to the list)" value="${esc(curReasons.filter(r => reasonsList.indexOf(r) === -1).join('; '))}" style="margin-top:6px"></div>` : ''}
       <div class="fsec">Readings</div>
       ${allOk.length > 1 && !existing ? `<button type="button" class="btn btn-ghost btn-sm" id="cfAllOk" style="margin-bottom:10px">${ico('check')} All checks OK</button>` : ''}
       <div class="form-grid">${st.fields.map(f => fieldInput(f, filled[f.key].v, ctxOf(f))).join('')}
         <div class="field"><label for="cfOperator">Operator <span class="req">*</span>${opSrc ? `<span class="af">${esc(opSrc)}</span>` : ''}</label>
-          <select id="cfOperator" data-pick="1" class="${opSrc ? 'af-on' : ''}">${blankOption('operator', true)}${mergeOptions(opList, operator ? [operator] : []).map(o => `<option ${o === operator ? 'selected' : ''}>${esc(o)}</option>`).join('')}<option value="__other">Other…</option></select>
-          <input id="cfOperator_o" class="hidden" maxlength="80" placeholder="Operator's name" style="margin-top:6px"></div></div>
+          <input id="cfOperator" class="${opSrc ? 'af-on' : ''}" list="cfOperator_l" data-new="${esc(st.operatorList)}" value="${esc(operator)}" maxlength="80" placeholder="Select or type the name"><datalist id="cfOperator_l">${mergeOptions(opList, operator ? [operator] : []).map(o => `<option value="${esc(o)}">`).join('')}</datalist></div></div>
       <div class="fsec">Photos</div>
       <div class="capture">${st.photos.map(p => `<div class="cap" data-photo="${p.key}" tabindex="0">${ico('cam')}<span>${esc(p.label)}</span></div>`).join('')}</div>
       <div class="fsec">Production Supervisor</div>
@@ -2588,11 +2683,16 @@ async function openCardForm(batchNo, stageKey, editing) {
   }));
   $$('#cfReasons .chip', el).forEach(c => c.addEventListener('click', () => c.classList.toggle('on')));
   const filmSel = $('#cf_Film', el);
-  if (filmSel) filmSel.addEventListener('change', () => {
-    const f = S.D.films.find(x => String(x.Film) === filmSel.value) || {};
-    st.fields.filter(x => x.type === 'auto').forEach(x => { const t = $('#cf_' + x.key, el); if (t) t.textContent = f[x.auto] || '—'; });
-  });
-  if (filmSel && !existing) filmSel.dispatchEvent(new Event('change'));
+  const showFilm = () => {
+    const name = filmSel.value.trim(), f = S.D.films.find(x => String(x.Film).toUpperCase() === name.toUpperCase());
+    // A new film: micron × width × margin from a name like 6.5X75X2.5.
+    const mm = !f && name.toUpperCase().replace(/\s+/g, '').match(/^(\d+(?:\.\d+)?)X(\d+(?:\.\d+)?)X(\d+(?:\.\d+)?)/);
+    const src = f || (mm ? { Micron: mm[1], Width: mm[2], Free_Margin: mm[3] } : {});
+    st.fields.filter(x => x.type === 'auto').forEach(x => { const t = $('#cf_' + x.key, el); if (t) t.textContent = blankV(src[x.auto]) ? '—' : src[x.auto]; });
+    const h = $('[data-hint="Film"]', el);
+    if (h) h.textContent = name && !f ? 'New film — added to Films when you save.' : '';
+  };
+  if (filmSel) { filmSel.addEventListener('input', showFilm); filmSel.addEventListener('change', showFilm); if (!existing) showFilm(); }
   if ($('#cfResign', el)) $('#cfResign', el).addEventListener('click', () => { $('#cfSigWrap', el).classList.remove('hidden'); $('#cfResign', el).parentNode.remove(); setTimeout(pad.clear, 30); });
 
   function paintCap(key) {
@@ -2668,9 +2768,10 @@ async function openCardForm(batchNo, stageKey, editing) {
     if ((tIn && tIn > Date.now() + 15 * 60000) || (tOut && tOut > Date.now() + 15 * 60000)) { err.textContent = 'A time is in the future.'; return; }
     // Things that are allowed but are usually a slip: asked about once, before saving.
     const warns = [];
-    if (prevGood !== null && num(c.totalQty) > prevGood) warns.push('Total ' + fmtNum(c.totalQty) + ' is more than the ' + fmtNum(prevGood) + ' good from ' + prevSt.name + '.');
+    if (prevGood !== null && num(c.totalQty) > prevGood) warns.push('Total ' + fmtNum(c.totalQty) + ' ' + U + ' is more than ' + (conv ? 'the ' + fmtNum(prevGood) + ' capacitors the ' + fmtNum(prevGoodRaw) + ' good elements make' : 'the ' + fmtNum(prevGood) + ' good from ' + prevSt.name) + '.');
     st.fields.filter(f => f.check).forEach(f => { const r = readingCheck(c.fields[f.key], pastNumbers(stageKey, batchNo, f.key)); if (r) warns.push(f.label + ' ' + fmtNum(c.fields[f.key]) + (f.unit ? ' ' + f.unit : '') + ': ' + r.msg); });
-    const newVal = (label, v, list) => { if (!v || list.some(o => o.toUpperCase() === v.toUpperCase())) return; const near = nearName(v, list); warns.push(near ? label + ' “' + v + '” isn’t in the list. Did you mean “' + near + '”?' : label + ' “' + v + '” isn’t in the list. Check the spelling.'); };
+    // New values are fine (they join the list); a near miss of one already there is asked about.
+    const newVal = (label, v, list) => { if (!v || list.some(o => o.toUpperCase() === v.toUpperCase())) return; const near = nearName(v, list); if (near) warns.push(label + ' “' + v + '” is new. Did you mean “' + near + '”?'); };
     newVal('Operator', c.operator, opList);
     st.fields.filter(f => f.type === 'list').forEach(f => newVal(f.label, c.fields[f.key], mergeOptions(S.D.lists[f.list] || [], distinctPast([stageKey], f.key))));
     if (c.supName && supNames.length && !supNames.some(o => o.toUpperCase() === c.supName.toUpperCase())) { const near = nearName(c.supName, supNames); if (near) warns.push('Supervisor “' + c.supName + '”: did you mean “' + near + '”?'); }
@@ -2692,7 +2793,7 @@ async function openCardForm(batchNo, stageKey, editing) {
         store(lastKey(stageKey), keep);
       }
       m.close(); applyResult(d); flushAlerts();
-      toast(editing ? 'Saved.' : st.name + ' recorded for ' + batchNo + '. PQA has been told.', 'ok');
+      toast(editing ? 'Saved.' : st.name + ' recorded for ' + batchNo + '. PQA has been told.' + (d.lists || d.films ? ' New drop-down values were added.' : ''), 'ok');
       if (S.route.page !== 'batch') go('#/batch/' + batchNo + '/' + stageKey);
     } catch (x) { err.textContent = x.message; } finally { done(); }
   });
@@ -2795,7 +2896,7 @@ ACT.qr = (el) => {
   const m = openModal(modalHead('QR label', b.Batch_No, 'Scan it with the app (or any camera) to open this batch card.') +
     `<div class="modal-body" style="align-items:center"><div id="qrLabel" style="text-align:center;padding:14px;border:1px dashed var(--line);border-radius:12px;background:#fff;color:#111">
       <img src="${qr}" alt="QR" style="width:220px;height:220px;display:block;margin:0 auto"><div style="font-family:var(--mono);font-weight:700;font-size:20px;margin-top:6px">${esc(b.Batch_No)}</div>
-      <div style="font-size:12px">${esc(b.Product_Name || b.Part_Code)}</div><div style="font-size:11px;color:#555">${esc(b.Customer_Name || '')} · ${fmtNum(b.Total_Qty)} pcs</div></div></div>
+      <div style="font-size:12px">${esc(b.Product_Name || b.Part_Code)}</div><div style="font-size:11px;color:#555">${esc(b.Customer_Name || '')} · ${fmtNum(b.Total_Qty)} ${hasPerCap(b) ? 'capacitors × ' + perCap(b) + ' elements' : 'pcs'}</div></div></div>
     <div class="modal-foot"><button class="btn btn-ghost" data-close>Close</button><button class="btn btn-primary" id="qrPrint">Print label</button></div>`);
   $('#qrPrint', m.el).addEventListener('click', () => {
     const w = window.open('', '_blank');
@@ -2905,10 +3006,12 @@ ACT.export = async (el) => {
     const list = filteredBatches();
     const nos = new Set(list.map(b => b.Batch_No));
     const sheets = [{ name: 'Batches', columns: [['Batch_No', 'Batch'], ['Part_Code', 'Part code'], ['Product_Name', 'Product'], ['Customer_Name', 'Customer'], ['Rating', 'Rating'], ['Voltage', 'Voltage'], ['Status', 'Status'], ['Where', 'Where'],
-        ['Total_Qty', 'Total'], ['Good_Qty', 'Good'], ['Reject_Qty', 'Rejected'], ['Yield', 'Yield %'], ['Created', 'Started'], ['Done', 'Completed'], ['FG_TxnID', 'FG entry']].map(c => ({ key: c[0], label: c[1] })),
-      rows: list.map(b => Object.assign({}, b, { Where: info(b).label, Yield: num(b.Good_Qty) + num(b.Reject_Qty) ? Math.round(num(b.Good_Qty) / (num(b.Good_Qty) + num(b.Reject_Qty)) * 1000) / 10 : '', Created: dt(b.Created_At), Done: dt(b.Done_At) })) }];
+        ['Total_Qty', 'Quantity (capacitors)'], ['Winding_MFD', 'Winding element MFD'], ['Elements_Per_Cap', 'Elements per capacitor'], ['Connection', 'Connection'], ['Element_Qty', 'Elements to wind'],
+        ['Good_Qty', 'Good (capacitors)'], ['Reject_Elements', 'Rejected elements'], ['Reject_Caps', 'Rejected capacitors'], ['Yield', 'Yield %'], ['Created', 'Started'], ['Done', 'Completed'], ['FG_TxnID', 'FG entry']].map(c => ({ key: c[0], label: c[1] })),
+      rows: list.map(b => Object.assign({}, b, { Where: info(b).label, Yield: yieldFrac(b) === '' ? '' : Math.round(yieldFrac(b) * 1000) / 10, Created: dt(b.Created_At), Done: dt(b.Done_At) })) }];
     stages().forEach(st => {
-      const cols = [['Batch_No', 'Batch'], ['Recorded', 'Recorded'], ['By', 'Recorded by'], ['Total_Qty', 'Total'], ['Reject_Qty', 'Rejected'], ['Good_Qty', 'Good'], ['Reject_Reason', 'Reject reason'], ['Operator', 'Operator']]
+      const u = st.unit === 'capacitors' ? ' (capacitors)' : ' (elements)';
+      const cols = [['Batch_No', 'Batch'], ['Recorded', 'Recorded'], ['By', 'Recorded by'], ['Total_Qty', 'Total' + u], ['Reject_Qty', 'Rejected' + u], ['Good_Qty', 'Good' + u], ['Reject_Reason', 'Reject reason'], ['Operator', 'Operator']]
         .concat(st.fields.map(f => [f.key, f.label + (f.unit ? ' (' + f.unit + ')' : '')])).concat([['PQA', 'PQA by'], ['PQAAt', 'PQA at'], ['Remarks', 'Remarks']]);
       sheets.push({ name: st.no + ' ' + st.name.replace(/&/g, 'and'), columns: cols.map(c => ({ key: c[0], label: c[1] })),
         rows: (S.D.cards[st.key] || []).filter(c => nos.has(c.Batch_No)).map(c => { const o = Object.assign({}, c, { Recorded: dt(c.Recorded_At), By: nameOf(c.Recorded_By), PQA: nameOf(c.PQA_By), PQAAt: dt(c.PQA_At) });
@@ -2926,15 +3029,15 @@ ACT.export = async (el) => {
 function renderDropdowns() {
   setTitle('Manage', 'Dropdowns');
   if (!S.D.can.lists) return '<div class="card empty">You don’t have access to change dropdowns.</div>';
-  const lists = Object.assign({}, ...['Customers', 'Ratings', 'Voltages', 'Winding MFD', 'Winding Machines', 'Winding Operators', 'Spray Operators', 'Heat Stabilizing Operators', 'Short Clearing Operators', 'Welding Operators', 'Pouring Operators', 'Testing Operators', 'Auditors', 'Core Sizes', 'Can Sizes', 'Wire Colours', 'Reject Reasons'].map(k => ({ [k]: S.D.lists[k] || [] })), S.D.lists);
+  const lists = Object.assign({}, ...['Customers', 'Ratings', 'Voltages', 'Winding MFD', 'Connections', 'Can Types', 'Assembly Types', 'Winding Machines', 'Winding Operators', 'Spray Operators', 'Heat Stabilizing Operators', 'Short Clearing Operators', 'Welding Operators', 'Pouring Operators', 'Testing Operators', 'Auditors', 'Core Sizes', 'Can Sizes', 'Wire Colours', 'Reject Reasons'].map(k => ({ [k]: S.D.lists[k] || [] })), S.D.lists);
   const names = Object.keys(lists);
   const cur = S.view.ddList || 'Products';
   const chip = (n, count) => `<button class="chip ${cur === n ? 'on' : ''}" data-act="ddpick" data-v="${esc(n)}">${esc(n)} <span class="faint">${count}</span></button>`;
   let body;
   if (cur === 'Products') {
     body = `<div class="card"><div class="card-head"><div><h3>Products</h3><p>Choosing a part code on a new batch fills these in. “Stock FG code” links it to Stock Management when the part code differs.</p></div><button class="btn btn-primary btn-sm" data-act="ddedit" data-k="product">${ico('plus')}Add product</button></div>
-      <div class="tbl-wrap" style="margin-top:12px"><table class="tbl"><thead><tr><th>Part code</th><th>Product</th><th>Rating</th><th>Voltage</th><th>Winding MFD</th><th>Film</th><th>Core</th><th>Can</th><th>Stock FG code</th><th></th></tr></thead><tbody>
-      ${S.D.products.slice().sort((a, b) => String(a.Part_Code).localeCompare(String(b.Part_Code))).map(p => `<tr data-act="ddedit" data-k="product" data-id="${esc(p.Row_ID)}"><td class="mono"><b>${esc(p.Part_Code)}</b></td><td>${esc(p.Product_Name)}</td><td>${esc(p.Rating)}</td><td>${esc(p.Voltage)}</td><td>${esc(p.Winding_MFD)}</td><td>${esc(p.Film)}</td><td>${esc(p.Core_Size)}</td><td>${esc(p.Can_Size)}</td><td class="mono">${esc(p.Stock_FG_Code)}</td>
+      <div class="tbl-wrap" style="margin-top:12px"><table class="tbl"><thead><tr><th>Part code</th><th>Product</th><th>Rating</th><th>Voltage</th><th>Winding MFD</th><th class="num">Elements</th><th>Connection</th><th>Film</th><th>Core</th><th>Can</th><th>Stock FG code</th><th></th></tr></thead><tbody>
+      ${S.D.products.slice().sort((a, b) => String(a.Part_Code).localeCompare(String(b.Part_Code))).map(p => `<tr data-act="ddedit" data-k="product" data-id="${esc(p.Row_ID)}"><td class="mono"><b>${esc(p.Part_Code)}</b></td><td>${esc(p.Product_Name)}</td><td>${esc(p.Rating)}</td><td>${esc(p.Voltage)}</td><td>${esc(p.Winding_MFD)}</td><td class="num">${esc(p.Elements_Per_Cap)}</td><td>${esc(p.Connection)}</td><td>${esc(p.Film)}</td><td>${esc(p.Core_Size)}</td><td>${esc(p.Can_Size)}</td><td class="mono">${esc(p.Stock_FG_Code)}</td>
         <td><button class="icon-btn" data-act="dddel" data-k="product" data-id="${esc(p.Row_ID)}" title="Delete">${ico('trash')}</button></td></tr>`).join('')}</tbody></table></div></div>`;
   } else if (cur === 'Films') {
     body = `<div class="card"><div class="card-head"><div><h3>Films</h3><p>Choosing the film on Winding fills micron, width, margin, type and resistivity.</p></div><button class="btn btn-primary btn-sm" data-act="ddedit" data-k="film">${ico('plus')}Add film</button></div>
@@ -2969,12 +3072,16 @@ ACT.ddedit = async (el, e) => {
   const kind = el.dataset.k, rec = el.dataset.id ? (kind === 'film' ? S.D.films : S.D.products).find(x => x.Row_ID === el.dataset.id) : {};
   const fieldsDef = kind === 'film'
     ? [['Film', 'Film', 'text', true], ['Micron', 'Micron'], ['Width', 'Width'], ['Free_Margin', 'Free margin'], ['Film_Type', 'Film type', 'select', false, ['SERIES', 'STANDARD', 'SLOPE WC', 'WAVE CUT']], ['Film_Resistivity', 'Film resistivity']]
-    : [['Part_Code', 'Part code', 'text', true], ['Product_Name', 'Product name'], ['Rating', 'Rating', 'list', false, 'Ratings'], ['Voltage', 'Voltage', 'list', false, 'Voltages'], ['Winding_MFD', 'Winding MFD', 'list', false, 'Winding MFD'],
-       ['Film', 'Film', 'select', false, S.D.films.map(f => f.Film)], ['Core_Size', 'Core size', 'list', false, 'Core Sizes'], ['Can_Size', 'Can size', 'list', false, 'Can Sizes'], ['Stock_FG_Code', 'Stock FG code (if different)', 'fg']];
+    : [['Part_Code', 'Part code', 'text', true], ['Product_Name', 'Product name'], ['Rating', 'Rating', 'list', false, 'Ratings'], ['Voltage', 'Voltage', 'list', false, 'Voltages'], ['Winding_MFD', 'Winding element MFD', 'list', false, 'Winding MFD'],
+       ['Elements_Per_Cap', 'Elements per capacitor', 'int'], ['Connection', 'Connection', 'list', false, 'Connections'],
+       ['Film', 'Film', 'film'], ['Core_Size', 'Core size', 'list', false, 'Core Sizes'], ['Can_Size', 'Can size', 'list', false, 'Can Sizes'], ['Stock_FG_Code', 'Stock FG code (if different)', 'fg']];
   const input = (f) => {
     const v = rec[f[0]] || '';
     if (f[2] === 'select') return `<select id="dd_${f[0]}">${blankOption(f[1], f[3])}${f[4].map(o => `<option ${o === v ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
-    if (f[2] === 'list') return `<input id="dd_${f[0]}" list="dd_${f[0]}_l" value="${esc(v)}" autocomplete="off"><datalist id="dd_${f[0]}_l">${(S.D.lists[f[4]] || []).map(o => `<option value="${esc(o)}">`).join('')}</datalist>`;
+    // Type-or-pick: a value that isn't in the list yet is added to it on save.
+    if (f[2] === 'list') return `<input id="dd_${f[0]}" list="dd_${f[0]}_l" data-new="${esc(f[4])}" value="${esc(v)}" autocomplete="off" maxlength="120"><datalist id="dd_${f[0]}_l">${(S.D.lists[f[4]] || []).map(o => `<option value="${esc(o)}">`).join('')}</datalist>`;
+    if (f[2] === 'film') return `<input id="dd_${f[0]}" class="mono" list="dd_${f[0]}_l" data-new="Films" value="${esc(v)}" autocomplete="off" maxlength="60" placeholder="Select or type"><datalist id="dd_${f[0]}_l">${S.D.films.map(x => `<option value="${esc(x.Film)}">${esc([x.Film_Type, x.Micron ? x.Micron + ' µ' : ''].filter(Boolean).join(' · '))}</option>`).join('')}</datalist>`;
+    if (f[2] === 'int') return `<input id="dd_${f[0]}" type="number" inputmode="numeric" min="1" max="999" step="1" value="${esc(v)}" placeholder="e.g. 3">`;
     if (f[2] === 'fg') return `<input id="dd_${f[0]}" list="dd_fg_l" value="${esc(v)}" autocomplete="off" placeholder="Only if Stock uses another code"><datalist id="dd_fg_l"></datalist>`;
     return `<input id="dd_${f[0]}" value="${esc(v)}" maxlength="120">`;
   };
@@ -2990,7 +3097,8 @@ ACT.ddedit = async (el, e) => {
     const p = { Row_ID: rec.Row_ID || '' };
     fieldsDef.forEach(f => { p[f[0]] = $('#dd_' + f[0], m.el).value.trim(); });
     const done = btnBusy(ev.currentTarget);
-    try { applyResult(await api(kind === 'film' ? 'saveFilm' : 'saveProduct', p)); m.close(); toast('Saved.', 'ok'); } catch (x) { $('#ddErr', m.el).textContent = x.message; } finally { done(); }
+    if (p.Elements_Per_Cap && !(Math.round(num(p.Elements_Per_Cap)) === num(p.Elements_Per_Cap) && num(p.Elements_Per_Cap) >= 1 && num(p.Elements_Per_Cap) <= 999)) { $('#ddErr', m.el).textContent = 'No. of elements per capacitor must be a whole number from 1 to 999.'; done(); return; }
+    try { const d = await api(kind === 'film' ? 'saveFilm' : 'saveProduct', p); applyResult(d); m.close(); toast('Saved.' + (d.lists || (kind === 'product' && d.films) ? ' New drop-down values were added.' : ''), 'ok'); } catch (x) { $('#ddErr', m.el).textContent = x.message; } finally { done(); }
   });
 };
 
