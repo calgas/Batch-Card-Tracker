@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
-<meta name="app-version" content="1.3.1">
+<meta name="app-version" content="1.4.0">
 <meta name="theme-color" content="#15181d">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -114,6 +114,19 @@
   .field .unit { position: absolute; right: 11px; top: 50%; transform: translateY(-50%); font-size: 12px; color: var(--ink-faint); font-weight: 600; pointer-events: none; }
   .field .auto { min-height: 42px; padding: 10px 12px; border-radius: 10px; background: var(--line-soft); color: var(--ink-soft); font-weight: 600; font-family: var(--mono); font-size: 13px; }
   .hint { font-size: 12px; color: var(--ink-faint); }
+  /* Boxes with a list to pick from: the list under the box (see sugOpen) */
+  .sug-in { padding-right: 34px !important; cursor: text;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='M4 6.5L8 10.5L12 6.5' stroke='%23949ca6' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important; background-position: right 11px center !important; background-size: 15px !important; }
+  .sug-pop { position: fixed; z-index: 95; overflow-y: auto; overscroll-behavior: contain; padding: 4px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow-lift); }
+  .sug-it { padding: 7px 10px; border-radius: 7px; cursor: pointer; line-height: 1.3; color: var(--ink); }
+  .sug-it b { display: block; font-size: 13.5px; font-weight: 600; overflow-wrap: anywhere; }
+  .sug-it small { display: block; margin-top: 1px; font-size: 11.5px; color: var(--ink-soft); overflow-wrap: anywhere; }
+  .sug-it:hover { background: var(--hover); }
+  .sug-it.on { background: var(--copper-soft); }
+  .sug-it.on b { color: var(--copper); }
+  .sug-none { padding: 10px 12px; font-size: 12.5px; color: var(--ink-faint); }
   .field .hint:not(:empty) { margin-top: 4px; }
   .hint.warn { color: #a07617; font-weight: 600; background: var(--warn-soft); padding: 5px 8px; border-radius: 7px; }
   .linkish { color: var(--copper); font-weight: 700; text-decoration: underline; padding: 0 2px; font-size: inherit; }
@@ -219,6 +232,44 @@
   .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
   .page-head p { margin: 4px 0 0; color: var(--ink-soft); font-size: 13.5px; }
   .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 16px; }
+  /* The bell (1.4) */
+  .notif-wrap { position: relative; }
+  .notif-btn { position: relative; }
+  .notif-count { position: absolute; top: 2px; right: 1px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px; background: var(--bad); color: #fff;
+                 font-size: 10.5px; font-weight: 700; line-height: 17px; text-align: center; box-shadow: 0 0 0 2px var(--paper); pointer-events: none; }
+  .notif-panel { position: absolute; top: calc(100% + 8px); right: 0; width: 380px; max-height: min(72vh, 580px); display: flex; flex-direction: column; text-align: left;
+                 background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow-lift); z-index: 90; overflow: hidden; }
+  .notif-head { display: flex; align-items: center; gap: 8px; padding: 10px 10px 10px 16px; border-bottom: 1px solid var(--line); }
+  .notif-head h4 { margin: 0; font-size: 15px; flex: 1; }
+  .notif-head .btn { min-height: 0; padding: 6px 10px; font-size: 12.5px; }
+  .notif-list { overflow-y: auto; flex: 1; overscroll-behavior: contain; }
+  .notif-item { display: block; width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--line-soft); background: transparent; font: inherit; color: var(--ink);
+                padding: 11px 16px 11px 30px; cursor: pointer; position: relative; }
+  .notif-item:hover { background: var(--hover); }
+  .notif-item.unread::before { content: ''; position: absolute; left: 13px; top: 17px; width: 8px; height: 8px; border-radius: 50%; background: var(--copper); }
+  .notif-item b { display: block; font-size: 13.5px; }
+  .notif-item:not(.unread) b { font-weight: 600; color: var(--ink-soft); }
+  .notif-item span { display: block; font-size: 12.5px; color: var(--ink-soft); margin-top: 2px; line-height: 1.45; }
+  .notif-item time { display: block; font-size: 11px; color: var(--ink-faint); margin-top: 4px; }
+  .notif-empty { padding: 30px 18px; text-align: center; color: var(--ink-soft); font-size: 13px; line-height: 1.5; }
+  .notif-foot { padding: 10px 14px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--ink-soft); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; line-height: 1.45; background: var(--panel-2); }
+  .notif-foot .btn { min-height: 0; padding: 7px 12px; font-size: 12.5px; }
+  .notif-foot .grow { flex: 1; }
+  .notif-on { color: var(--ok); font-weight: 600; }
+  @media (max-width: 780px) {
+    .notif-wrap { position: static; }
+    .notif-panel { left: 8px; right: 8px; top: calc(100% + 4px); width: auto; max-height: calc(var(--vh) - 170px); }
+  }
+  /* Sortable headings (1.4.0) */
+  .tbl th.th-sort { cursor: pointer; user-select: none; }
+  .tbl th.th-sort:hover { color: var(--ink); }
+  .tbl th.th-sort.on { color: var(--copper); }
+  .tbl th .sort-ind { margin-left: 5px; font-size: 9.5px; opacity: .45; letter-spacing: 0; }
+  .tbl th.th-sort.on .sort-ind { opacity: 1; }
+  .toolbar select.input { padding-right: 34px; }
+  .st-filters #stSearch { flex: 1 1 260px; min-width: 200px; max-width: 360px; }
+  .st-filters select.input { width: auto; min-width: 140px; max-width: 220px; }
+  @media (max-width: 760px) { .st-filters #stSearch { max-width: none; flex: 1 1 100%; } .st-filters select.input { max-width: none; min-width: 0; flex: 1 1 40%; } }
   .toolbar .grow { flex: 1; }
   .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-sm); }
   .card-pad { padding: 18px 20px; }
@@ -362,6 +413,7 @@
   .modal-head h3 { margin: 2px 0 0; font-size: 18px; } .modal-head p { margin: 3px 0 0; font-size: 12.5px; color: var(--ink-soft); }
   .modal-head .icon-btn { margin-left: auto; }
   .modal-body { padding: 18px 22px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
+  .modal-body > * { flex-shrink: 0; }
   .modal-foot { padding: 14px 22px; border-top: 1px solid var(--line-soft); display: flex; gap: 10px; justify-content: flex-end; align-items: center; flex-wrap: wrap; }
   .modal-foot .grow { flex: 1; }
   .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
@@ -506,6 +558,7 @@
   <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
   <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></symbol>
   <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></symbol>
   <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></symbol>
   <symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 0 0-14.9-3M4 4v4h4M4 13a8 8 0 0 0 14.9 3M20 20v-4h-4"/></symbol>
   <symbol id="i-out" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H3"/></symbol>
@@ -581,6 +634,10 @@
       <span class="sync desk-only" id="sync"><i></i><span id="syncText">Up to date</span></span>
       <div class="zoom-ctl desk-only" role="group" aria-label="Zoom"><button data-zoom="-1" aria-label="Zoom out">−</button><button data-zoom="0" class="zl" id="zoomLabel">100%</button><button data-zoom="1" aria-label="Zoom in">+</button></div>
       <button class="icon-btn desk-only" id="refreshBtn" title="Refresh" aria-label="Refresh"><svg class="icon"><use href="#i-refresh"/></svg></button>
+      <div class="notif-wrap">
+        <button class="icon-btn notif-btn" id="notifBtn" title="Notifications" aria-label="Notifications" aria-haspopup="dialog" aria-expanded="false"><svg class="icon"><use href="#i-bell"/></svg><span class="notif-count hidden" id="notifCount">0</span></button>
+        <div class="notif-panel hidden" id="notifPanel" role="dialog" aria-label="Notifications"></div>
+      </div>
       <button class="icon-btn" id="themeBtn" title="Light or dark" aria-label="Light or dark"><svg class="icon"><use href="#i-moon"/></svg></button>
       <button class="btn btn-primary desk-only hidden" id="newBatchBtn"><svg class="icon"><use href="#i-plus"/></svg>New batch</button>
     </header>
@@ -602,7 +659,7 @@
    behind the figures already on screen.
    ========================================================================= */
 
-const APP_VERSION = '1.3.1';
+const APP_VERSION = '1.4.0';
 const BCT_API_URL = 'https://script.google.com/macros/s/AKfycbxdCU4dK92I_Q5mlzhp9cEw_efeX5bVfkfLfqbNf_5eDpyj1RljUh0WqO-Y5-t3RhNZ/exec';
 const STOCK_API_URL = 'https://script.google.com/macros/s/AKfycbzs_aW0G-NvVvs-_Yk41d4esq1lkKVBTzQEQTrbbIKe7kQfoYdXD3cuhd6Wt2UQ6MU0/exec';
 const APP_URL = 'https://calgas.github.io/Batch-Card-Tracker/';
@@ -618,7 +675,7 @@ const S = {
   inflight: 0,
   lastSync: 0,
   route: { page: 'overview' },
-  view: { batchFilter: 'open', batchView: 'board', batchSearch: '', customer: '', stageTab: {}, ddList: null },
+  view: { batchFilter: 'open', batchView: 'board', batchSearch: '', customer: '', stageTab: {}, ddList: null, sort: {}, stageF: {} },
   localMedia: {},     // fileId -> object URL of what this device just uploaded
   fgCatalog: null
 };
@@ -726,6 +783,7 @@ function stockApi(action, params, timeout) { return post(STOCK_API_URL, action, 
 function sessionEnded(msg) {
   if (!S.session) return;
   S.session = null; store(SESSION_KEY);
+  stopNotifications();
   closeAllModals();
   showLogin(msg || 'Your sign-in has ended — please sign in again.');
 }
@@ -753,6 +811,8 @@ async function doLogin(e) {
 }
 async function signOut() {
   if (!await confirmBox('Sign out of Batch Card Tracker on this device?', { title: 'Sign out', ok: 'Sign out' })) return;
+  await releasePushForSignOut();
+  stopNotifications();
   const token = S.session && S.session.token;
   S.session = null; store(SESSION_KEY);
   stockApi('logout', { token }).catch(() => {});
@@ -877,6 +937,32 @@ function readingCheck(value, past) {
   return { msg: 'Earlier batches: ' + range + (fix !== null ? '. Did you mean ' + fmtNum(fix) + '?' : ''), fix };
 }
 function signed(c) { return !!(c && (c.PQA_Signature || c.PQA_At)); }
+
+/* ---------- Sortable tables (1.4.0) ----------
+   Click a column heading to sort by it; click again to reverse. Empty
+   values always go last. S.view.sort[table] = { k: column, dir: 1 | -1 }. */
+function thSort(tid, key, label, cls) {
+  const s = S.view.sort[tid] || {}, on = s.k === key;
+  return `<th class="th-sort ${cls || ''}${on ? ' on' : ''}" data-act="sort" data-t="${tid}" data-k="${esc(key)}" aria-sort="${on ? (s.dir > 0 ? 'ascending' : 'descending') : 'none'}" title="Sort by ${esc(String(label).toLowerCase())}">${esc(label)}<span class="sort-ind">${on ? (s.dir > 0 ? '▲' : '▼') : '⇅'}</span></th>`;
+}
+function sortValue(v) {
+  if (v === '' || v === null || v === undefined) return '';
+  if (typeof v === 'number') return v;
+  const n = Number(String(v).replace(/,/g, ''));
+  return String(v).trim() !== '' && isFinite(n) ? n : String(v);
+}
+function sortRows(tid, rows, valueOf, def) {
+  const s = S.view.sort[tid] || def;
+  if (!s || !s.k) return rows;
+  const keyed = rows.map(r => ({ r, v: sortValue(valueOf(r, s.k)) }));
+  const blank = keyed.filter(x => x.v === ''), full = keyed.filter(x => x.v !== '');
+  full.sort((a, b) => {
+    const c = typeof a.v === 'number' && typeof b.v === 'number' ? a.v - b.v : String(a.v).localeCompare(String(b.v), undefined, { numeric: true, sensitivity: 'base' });
+    return c * s.dir;
+  });
+  return full.concat(blank).map(x => x.r);
+}
+
 
 // Where a batch stands: step 0–16, the stage it is at, what's next.
 function info(b) {
@@ -1199,6 +1285,7 @@ function enterApp() {
   render();
   hideSplash();
   syncIdle();
+  startNotifications();
 }
 
 function wire() {
@@ -1212,6 +1299,7 @@ function wire() {
     if (a && ACT[a.dataset.act]) { e.preventDefault(); ACT[a.dataset.act](a, e); }
   });
   $('#signOutBtn').addEventListener('click', signOut);
+  wireNotifications();
   $('#themeBtn').addEventListener('click', () => setTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'));
   $('#refreshBtn').addEventListener('click', () => refresh(false));
   $('#backBtn').addEventListener('click', () => { if (history.length > 1) history.back(); else go('#/batches'); });
@@ -1271,6 +1359,387 @@ function pullToRefresh(c) {
     }
     ind.className = 'ptr back'; ind.style.transform = 'translateY(-48px)'; ind.style.opacity = 0;
   });
+}
+
+/* ---------- Boxes with a list to pick from (type to search) ----------
+   A box with list= (a <datalist>) gets the browser's own suggestion list,
+   which some browsers draw away from the box (top of the screen, far right)
+   and none let us style. Every such box gets this list instead: right under
+   the box (or above it near the bottom of the screen), filtering on any part
+   of the text as you type, ↑ ↓ and Enter to pick, Esc to close. The
+   <datalist> stays the source of the choices, so code that fills it later
+   still works. */
+const SUG = { panel: null, input: null, items: [], idx: -1, picking: false };
+function sugAdopt(input) {
+  if (input.dataset.sug !== undefined || !input.getAttribute('list')) return;
+  input.dataset.sug = input.getAttribute('list');
+  input.removeAttribute('list');
+  input.setAttribute('autocomplete', 'off');
+  input.setAttribute('role', 'combobox');
+  input.setAttribute('aria-autocomplete', 'list');
+  input.setAttribute('aria-expanded', 'false');
+  input.setAttribute('aria-controls', 'sugPop');
+  input.classList.add('sug-in');
+}
+function sugAdoptAll(root) { (root.querySelectorAll ? Array.from(root.querySelectorAll('input[list]')) : []).forEach(sugAdopt); if (root.matches && root.matches('input[list]')) sugAdopt(root); }
+function sugOptions(input) {
+  const dl = document.getElementById(input.dataset.sug);
+  if (!dl) return [];
+  return Array.from(dl.querySelectorAll('option')).map(o => {
+    const v = (o.getAttribute('value') !== null ? o.getAttribute('value') : o.textContent).trim();
+    const txt = (o.getAttribute('label') || o.textContent || '').trim();
+    return { v, t: txt && txt !== v ? txt : '' };
+  }).filter(o => o.v);
+}
+function sugPanel() {
+  if (SUG.panel) return SUG.panel;
+  const p = document.createElement('div');
+  p.className = 'sug-pop'; p.id = 'sugPop'; p.setAttribute('role', 'listbox'); p.style.display = 'none';
+  p.addEventListener('mousedown', e => e.preventDefault());          // keep the typing in the box
+  p.addEventListener('click', e => { const it = e.target.closest('[data-i]'); if (it) sugPick(Number(it.dataset.i)); });
+  document.body.appendChild(p);
+  return (SUG.panel = p);
+}
+function sugOpen(input, showAll) {
+  if (input.readOnly || input.disabled) return;
+  const opts = sugOptions(input);
+  if (!opts.length) { sugClose(); return; }
+  SUG.input = input;
+  const q = input.value.trim().toUpperCase();
+  const exact = opts.findIndex(o => o.v.toUpperCase() === q);
+  let list = opts;
+  if (q && !showAll && exact < 0) {
+    list = opts.filter(o => (o.v + ' ' + o.t).toUpperCase().indexOf(q) > -1);
+    list.sort((a, b) => (a.v.toUpperCase().indexOf(q) === 0 ? 0 : 1) - (b.v.toUpperCase().indexOf(q) === 0 ? 0 : 1));
+  }
+  SUG.items = list.slice(0, 400);
+  SUG.idx = exact > -1 && list === opts ? exact : (q && list.length ? 0 : -1);
+  const p = sugPanel();
+  p.innerHTML = SUG.items.length
+    ? SUG.items.map((o, i) => `<div class="sug-it${i === SUG.idx ? ' on' : ''}" role="option" id="sugOpt${i}" data-i="${i}" aria-selected="${i === SUG.idx}"><b>${esc(o.v)}</b>${o.t ? `<small>${esc(o.t)}</small>` : ''}</div>`).join('')
+    : '<div class="sug-none">Nothing matches “' + esc(input.value.trim()) + '”.</div>';
+  p.style.display = 'block';
+  input.setAttribute('aria-expanded', 'true');
+  sugPlace();
+  sugShow();
+}
+function sugClose() {
+  if (SUG.panel) SUG.panel.style.display = 'none';
+  if (SUG.input) SUG.input.setAttribute('aria-expanded', 'false');
+  SUG.input = null; SUG.items = []; SUG.idx = -1;
+}
+function sugIsOpen() { return !!(SUG.panel && SUG.panel.style.display === 'block' && SUG.input); }
+// Positions are measured on screen but set in CSS pixels; the app's zoom
+// can make those differ, so the ratio is measured rather than assumed.
+function sugPlace() {
+  const input = SUG.input, p = SUG.panel;
+  if (!input || !p) return;
+  if (!input.isConnected) { sugClose(); return; }
+  const r = input.getBoundingClientRect();
+  if (!r.width) { sugClose(); return; }
+  p.style.left = '100px'; p.style.top = '0px'; p.style.maxHeight = 'none';
+  const k = (p.getBoundingClientRect().left / 100) || 1;
+  const below = window.innerHeight - r.bottom - 10, above = r.top - 10;
+  const up = below < 220 && above > below;
+  const room = Math.max(120, Math.min(320, up ? above : below));
+  const width = Math.max(r.width, 220);
+  const left = Math.max(6, Math.min(r.left, window.innerWidth - width - 6));
+  p.style.width = (width / k) + 'px';
+  p.style.left = (left / k) + 'px';
+  p.style.maxHeight = (room / k) + 'px';
+  const h = Math.min(p.scrollHeight * k, room);
+  p.style.top = ((up ? r.top - 4 - h : r.bottom + 4) / k) + 'px';
+}
+function sugShow() {
+  if (!SUG.panel) return;
+  $$('.sug-it', SUG.panel).forEach((el, i) => { el.classList.toggle('on', i === SUG.idx); el.setAttribute('aria-selected', i === SUG.idx ? 'true' : 'false'); });
+  const on = SUG.panel.querySelector('.sug-it.on');
+  if (on) { on.scrollIntoView({ block: 'nearest' }); if (SUG.input) SUG.input.setAttribute('aria-activedescendant', on.id); }
+}
+function sugPick(i) {
+  const o = SUG.items[i], input = SUG.input;
+  if (!o || !input) return;
+  input.value = o.v;
+  sugClose();
+  SUG.picking = true;
+  try { input.dispatchEvent(new Event('input', { bubbles: true })); input.dispatchEvent(new Event('change', { bubbles: true })); }
+  finally { SUG.picking = false; }
+}
+(function () {
+  const isSug = (t) => t && t.tagName === 'INPUT' && t.dataset && t.dataset.sug !== undefined;
+  const start = () => {
+    sugAdoptAll(document.body);
+    new MutationObserver(ms => ms.forEach(m => m.addedNodes.forEach(n => { if (n.nodeType === 1) sugAdoptAll(n); }))).observe(document.body, { childList: true, subtree: true });
+  };
+  if (document.body) start(); else document.addEventListener('DOMContentLoaded', start);
+  document.addEventListener('click', e => {
+    if (isSug(e.target) && !(sugIsOpen() && SUG.input === e.target)) sugOpen(e.target, true);
+  });
+  document.addEventListener('input', e => { if (isSug(e.target) && !SUG.picking) sugOpen(e.target); });
+  document.addEventListener('keydown', e => {
+    if (!isSug(e.target)) return;
+    const open = sugIsOpen() && SUG.input === e.target;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!open) { sugOpen(e.target, true); return; }
+      const n = SUG.items.length;
+      if (!n) return;
+      SUG.idx = e.key === 'ArrowDown' ? (SUG.idx + 1) % n : (SUG.idx <= 0 ? n - 1 : SUG.idx - 1);
+      sugShow();
+    } else if (e.key === 'Enter' && open && SUG.idx > -1) {
+      e.preventDefault(); e.stopPropagation(); sugPick(SUG.idx);
+    } else if (e.key === 'Escape' && open) {
+      e.preventDefault(); e.stopPropagation(); sugClose();
+    } else if (e.key === 'Tab' && open) {
+      sugClose();
+    }
+  }, true);
+  document.addEventListener('focusout', e => { if (SUG.input && e.target === SUG.input) sugClose(); });
+  window.addEventListener('resize', () => { if (sugIsOpen()) sugPlace(); });
+  document.addEventListener('scroll', e => { if (sugIsOpen() && !(SUG.panel && SUG.panel.contains(e.target))) sugPlace(); }, true);
+})();
+
+
+/* =========================================================================
+   NOTIFICATIONS (1.4)
+   The bell beside the theme button lists what concerns you: cards waiting
+   for your PQA sign-off, holds and releases, cards sent back, batches that
+   passed Final Audit. Checked every minute while the app is open. "Turn on
+   notifications on this device" subscribes the phone or computer to Web
+   Push: the server sends an empty push and the service worker asks the
+   server for the newest notification with the device's own push address, so
+   it shows with the app closed. Signing out stops them on that device.
+   ========================================================================= */
+const NOTIF = { items: [], unread: 0, loadedAt: 0, loading: null, timer: null };
+const PUSH = { on: false, checked: false, saved: false };
+const PUSH_CACHE = 'calgas-bct-push';
+function pushSessionUrl() { return new URL('__push_session', location.href.split('#')[0]).href; }
+function pushSupported() { return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
+function isIos() { return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); }
+function isStandalone() { return (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true; }
+
+function loadNotifications(quiet) {
+  if (!S.session) return Promise.resolve();
+  if (NOTIF.loading) return NOTIF.loading;
+  NOTIF.loading = api('getNotifications', { limit: 40 }).then(d => {
+    NOTIF.items = d.items || []; NOTIF.unread = d.unread || 0; NOTIF.loadedAt = Date.now();
+    syncNotifBadge();
+    if (notifOpen()) renderNotifPanel();
+  }).catch(e => { if (!quiet && e.code !== 'SESSION') toast(e.message, true); }).finally(() => { NOTIF.loading = null; });
+  return NOTIF.loading;
+}
+function syncNotifBadge() {
+  const c = $('#notifCount'), b = $('#notifBtn');
+  if (c) { c.textContent = NOTIF.unread > 99 ? '99+' : String(NOTIF.unread); c.classList.toggle('hidden', !NOTIF.unread); }
+  if (b) { const t = NOTIF.unread ? NOTIF.unread + ' unread notification' + (NOTIF.unread === 1 ? '' : 's') : 'Notifications'; b.title = t; b.setAttribute('aria-label', t); }
+  try {
+    if (NOTIF.unread && navigator.setAppBadge) navigator.setAppBadge(NOTIF.unread).catch(() => {});
+    else if (!NOTIF.unread && navigator.clearAppBadge) navigator.clearAppBadge().catch(() => {});
+  } catch (e) {}
+}
+function notifAgo(ms) {
+  const s = (Date.now() - Number(ms)) / 1000;
+  if (s < 60) return 'just now';
+  if (s < 3600) return Math.floor(s / 60) + ' min ago';
+  if (s < 86400 && new Date(Number(ms)).toDateString() === new Date().toDateString()) return Math.floor(s / 3600) + ' h ago';
+  return new Date(Number(ms)).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+function notifOpen() { const p = $('#notifPanel'); return !!p && !p.classList.contains('hidden'); }
+function toggleNotifPanel(open) {
+  const p = $('#notifPanel'), btn = $('#notifBtn');
+  if (!p || !btn) return;
+  if (open === undefined) open = p.classList.contains('hidden');
+  if (open) { renderNotifPanel(); p.classList.remove('hidden'); loadNotifications(true); if (pushSupported() && !PUSH.checked) checkPush().then(renderNotifPanel); }
+  else p.classList.add('hidden');
+  btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+function pushFootHtml() {
+  if (!pushSupported()) {
+    return isIos() && !isStandalone()
+      ? '<span>To get notifications on iPhone: Share → <b>Add to Home Screen</b>, open the app from the icon, then turn them on here.</span>'
+      : '<span>This browser can’t show notifications. They still show here.</span>';
+  }
+  if (Notification.permission === 'denied') return '<span>Notifications are blocked for this site. Allow them in the browser’s site settings, then come back here.</span>';
+  if (PUSH.on) return '<span class="notif-on">This device gets notifications.</span><span class="grow"></span><button class="btn btn-ghost" data-nf="test">Send a test</button><button class="btn btn-ghost" data-nf="off">Turn off</button>';
+  return '<button class="btn btn-primary" data-nf="on">Turn on notifications on this device</button><span>You’ll get them even when the app is closed.</span>';
+}
+function renderNotifPanel() {
+  const p = $('#notifPanel');
+  if (!p) return;
+  const items = NOTIF.items;
+  p.innerHTML = '<div class="notif-head"><h4>Notifications</h4>' + (NOTIF.unread ? '<button class="btn btn-ghost" data-nf="all">Mark all read</button>' : '') +
+    '<button class="icon-btn" data-nf="close" aria-label="Close">' + ico('x') + '</button></div>' +
+    '<div class="notif-list">' + (items.length ? items.map(n =>
+      `<button class="notif-item${n.Read_At ? '' : ' unread'}" data-nid="${esc(n.ID)}"><b>${esc(n.Title)}</b>${n.Body ? `<span>${esc(n.Body)}</span>` : ''}<time>${esc(notifAgo(n.Created_At))}</time></button>`).join('')
+      : `<div class="notif-empty">${NOTIF.loadedAt ? 'Nothing yet. Cards waiting for your PQA sign-off, holds, cards sent back and finished batches show up here.' : 'Loading…'}</div>`) + '</div>' +
+    '<div class="notif-foot">' + pushFootHtml() + '</div>';
+}
+function markNotifRead(ids) {
+  let n = 0;
+  NOTIF.items.forEach(x => { if (!x.Read_At && (!ids || ids.indexOf(x.ID) > -1)) { x.Read_At = Date.now(); n++; } });
+  NOTIF.unread = ids ? Math.max(0, NOTIF.unread - n) : 0;
+  syncNotifBadge();
+  if (notifOpen()) renderNotifPanel();
+  api('markNotificationsRead', ids ? { ids } : {}).catch(() => {});
+}
+// Where a notification leads: "#/batch/CMPL0038" opens that batch.
+function openNotifLink(link) {
+  link = String(link || '');
+  if (!/^#\/batch\/[^/]+$/.test(link)) return;
+  closeAllModals();
+  go(link);
+  refresh(true);
+}
+async function onNotifPanelClick(e) {
+  const item = e.target.closest('[data-nid]');
+  if (item) {
+    const n = NOTIF.items.find(x => x.ID === item.dataset.nid);
+    if (!n) return;
+    if (!n.Read_At) markNotifRead([n.ID]);
+    toggleNotifPanel(false);
+    openNotifLink(n.Link);
+    return;
+  }
+  const b = e.target.closest('[data-nf]');
+  if (!b) return;
+  const a = b.dataset.nf;
+  if (a === 'close') toggleNotifPanel(false);
+  else if (a === 'all') markNotifRead(null);
+  else if (a === 'on') enablePush(b);
+  else if (a === 'off') disablePush(b);
+  else if (a === 'test') {
+    const done = btnBusy(b, 'Sending…');
+    try { await api('testPush', {}); toast('Test sent. It should pop up on this device in a few seconds.', 'ok'); loadNotifications(true); }
+    catch (x) { toast(x.message, true); } finally { done(); }
+  }
+}
+
+// ---- phone and computer notifications (Web Push) ----
+function b64uToBytes(s) {
+  const pad = '='.repeat((4 - s.length % 4) % 4), raw = atob((s + pad).replace(/-/g, '+').replace(/_/g, '/'));
+  const out = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+  return out;
+}
+function bytesToB64u(buf) {
+  if (!buf) return '';
+  const b = new Uint8Array(buf); let s = '';
+  for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i]);
+  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function deviceLabel() {
+  const ua = navigator.userAgent;
+  const os = /Android/.test(ua) ? 'Android' : isIos() ? 'iPhone/iPad' : /Windows/.test(ua) ? 'Windows' : /Mac/.test(ua) ? 'Mac' : /Linux/.test(ua) ? 'Linux' : 'Device';
+  const br = /Edg\//.test(ua) ? 'Edge' : /SamsungBrowser/.test(ua) ? 'Samsung Internet' : /Firefox\//.test(ua) ? 'Firefox' : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : 'Browser';
+  return os + ' · ' + br + (isStandalone() ? ' (app)' : '');
+}
+// Where the service worker asks for the newest notification after a push.
+function savePushSession() {
+  if (!('caches' in window) || PUSH.saved) return;
+  PUSH.saved = true;
+  caches.open(PUSH_CACHE).then(c => c.put(pushSessionUrl(), new Response(JSON.stringify({ url: BCT_API_URL }), { headers: { 'Content-Type': 'application/json' } })))
+    .catch(() => { PUSH.saved = false; });
+}
+function forgetPushSession() { PUSH.saved = false; if ('caches' in window) caches.delete(PUSH_CACHE).catch(() => {}); }
+async function pushRegistration() { return (await navigator.serviceWorker.getRegistration()) || navigator.serviceWorker.ready; }
+// On sign-in: if this device already has notifications on, they now go to
+// whoever just signed in.
+async function checkPush() {
+  PUSH.checked = true;
+  if (!pushSupported() || Notification.permission !== 'granted' || !S.session) { PUSH.on = false; return; }
+  try {
+    const reg = await pushRegistration();
+    const sub = reg && await reg.pushManager.getSubscription();
+    if (!sub) { PUSH.on = false; return; }
+    await api('savePushSubscription', { subscription: sub.toJSON(), device: deviceLabel() });
+    PUSH.on = true;
+    savePushSession();
+  } catch (e) { PUSH.on = false; }
+}
+async function enablePush(btn) {
+  const done = btnBusy(btn, 'Turning on…');
+  try {
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') { toast(perm === 'denied' ? 'Notifications are blocked. Allow them in the browser’s site settings.' : 'Notifications weren’t allowed.', true); return; }
+    const reg = await navigator.serviceWorker.ready;
+    const key = (await api('getPushKey', {})).key;
+    let sub = await reg.pushManager.getSubscription();
+    if (sub && sub.options && sub.options.applicationServerKey && bytesToB64u(sub.options.applicationServerKey) !== key) { await sub.unsubscribe(); sub = null; }
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64uToBytes(key) });
+    await api('savePushSubscription', { subscription: sub.toJSON(), device: deviceLabel() });
+    PUSH.on = true; PUSH.checked = true;
+    savePushSession();
+    toast('Notifications are on for this device.', 'ok');
+    api('testPush', {}).then(() => loadNotifications(true)).catch(() => {});
+  } catch (e) {
+    toast('Couldn’t turn on notifications: ' + (e && e.message || e), true);
+  } finally { if (btn.isConnected) done(); renderNotifPanel(); }
+}
+async function disablePush(btn) {
+  const done = btnBusy(btn, 'Turning off…');
+  try {
+    const reg = await pushRegistration();
+    const sub = reg && await reg.pushManager.getSubscription();
+    if (sub) { await api('removePushSubscription', { endpoint: sub.endpoint }).catch(() => {}); await sub.unsubscribe(); }
+    PUSH.on = false;
+    forgetPushSession();
+    toast('Notifications are off for this device.', 'ok');
+  } catch (e) { toast(e.message, true); }
+  finally { if (btn.isConnected) done(); renderNotifPanel(); }
+}
+// Signing out: this device stops getting the person's notifications. Runs
+// before the sign-in is dropped, while the server still accepts it.
+async function releasePushForSignOut() {
+  forgetPushSession();
+  if (!pushSupported() || !PUSH.on) return;
+  try {
+    const reg = await pushRegistration();
+    const sub = reg && await reg.pushManager.getSubscription();
+    if (sub) await api('removePushSubscription', { endpoint: sub.endpoint });
+  } catch (e) {}
+}
+function startNotifications() {
+  if (!S.session) return;
+  syncNotifBadge();
+  loadNotifications(true);
+  if (pushSupported()) checkPush();
+  clearInterval(NOTIF.timer);
+  NOTIF.timer = setInterval(() => { if (S.session && document.visibilityState === 'visible') loadNotifications(true); }, 60000);
+}
+function stopNotifications() {
+  clearInterval(NOTIF.timer); NOTIF.timer = null;
+  NOTIF.items = []; NOTIF.unread = 0; NOTIF.loadedAt = 0;
+  PUSH.on = false; PUSH.checked = false;
+  syncNotifBadge();
+  const p = $('#notifPanel'); if (p) p.classList.add('hidden');
+  forgetPushSession();
+}
+// A push opened the app: #notif=%23%2Fbatch%2FCMPL0038&id=N…
+function handleNotifLink() {
+  const m = location.hash.match(/^#notif=([^&]*)(?:&id=([^&]*))?/);
+  if (!m) return false;
+  const link = decodeURIComponent(m[1]), id = m[2] ? decodeURIComponent(m[2]) : '';
+  history.replaceState(null, '', location.pathname + location.search + (/^#\/batch\//.test(link) ? link : ''));
+  if (id) markNotifRead([id]);
+  return true;
+}
+function wireNotifications() {
+  const btn = $('#notifBtn'), panel = $('#notifPanel');
+  if (!btn || !panel) return;
+  btn.addEventListener('click', e => { e.stopPropagation(); toggleNotifPanel(); });
+  panel.addEventListener('click', e => { e.stopPropagation(); onNotifPanelClick(e); });
+  document.addEventListener('click', () => { if (notifOpen()) toggleNotifPanel(false); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && notifOpen()) toggleNotifPanel(false); });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && S.session && Date.now() - NOTIF.loadedAt > 20000) loadNotifications(true);
+  });
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', e => {
+      const d = e.data || {};
+      if (d.type === 'notif' && S.session) loadNotifications(true);
+      if (d.type === 'open-notif' && S.session) { if (d.id) markNotifRead([d.id]); openNotifLink(d.link); }
+    });
+  }
 }
 
 
@@ -1406,7 +1875,7 @@ function renderBatches() {
   const customers = Array.from(new Set(S.D.batches.map(b => b.Customer_Name).filter(Boolean))).sort();
   const counts = { open: 0, pqa: 0, hold: 0, stuck: 0, done: 0 };
   S.D.batches.forEach(b => { const i = info(b); if (i.open) counts.open++; if (i.open && i.waitingPqa) counts.pqa++; if (i.open && i.hold) counts.hold++; if (i.stuck) counts.stuck++; if (i.done) counts.done++; });
-  const segs = [['open', 'Open', counts.open], ['pqa', 'Waiting PQA', counts.pqa], ['hold', 'On hold', counts.hold], ['stuck', 'Not moving', counts.stuck], ['done', 'Completed', counts.done], ['all', 'All']];
+  const segs = [['open', 'Open', counts.open], ['pqa', 'Waiting PQA', counts.pqa], ['hold', 'On hold', counts.hold], ['stuck', 'Not moving', counts.stuck], ['done', 'Completed', counts.done], ['all', 'All', S.D.batches.length]];
   let body;
   if (!list.length) body = '<div class="card empty"><div class="big">🗂</div>No batches match.</div>';
   else if (v.batchView === 'board' && v.batchFilter !== 'done') {
@@ -1416,15 +1885,18 @@ function renderBatches() {
         ${c.items.map(bcard).join('') || '<div class="faint" style="padding:10px;font-size:12.5px;text-align:center">—</div>'}</div>`).join('') +
       (done.length ? `<div class="col"><div class="col-head"><span class="dot" style="background:var(--ok)"></span>Completed<span class="n">${done.length}</span></div>${done.map(bcard).join('')}</div>` : '') + '</div>';
   } else {
-    body = `<div class="card tbl-wrap"><table class="tbl"><thead><tr><th>Batch</th><th>Product</th><th>Customer</th><th>Where</th><th class="num">Total</th><th class="num">Good</th><th class="num">Yield</th><th>Started</th><th>Last activity</th></tr></thead><tbody>` +
-      list.map(b => `<tr data-act="open-batch" data-b="${esc(b.Batch_No)}"><td><b class="mono">${esc(b.Batch_No)}</b></td><td>${esc(b.Product_Name || b.Part_Code)}<div class="faint mono" style="font-size:11px">${esc(b.Part_Code)}</div></td>
+    const T = 'batches';
+    const val = (b, k) => ({ batch: b.Batch_No, product: b.Product_Name || b.Part_Code, customer: b.Customer_Name, where: info(b).done ? 99 : info(b).idx, total: num(b.Total_Qty), good: num(b.Good_Qty),
+      yield: num(b.Good_Qty) + num(b.Reject_Qty) ? num(b.Good_Qty) / (num(b.Good_Qty) + num(b.Reject_Qty)) : '', started: new Date(b.Created_At).getTime() || '', last: new Date(b.Last_Activity).getTime() || '' })[k];
+    body = `<div class="card tbl-wrap"><table class="tbl"><thead><tr>${thSort(T, 'batch', 'Batch')}${thSort(T, 'product', 'Product')}${thSort(T, 'customer', 'Customer')}${thSort(T, 'where', 'Where')}${thSort(T, 'total', 'Total', 'num')}${thSort(T, 'good', 'Good', 'num')}${thSort(T, 'yield', 'Yield', 'num')}${thSort(T, 'started', 'Started')}${thSort(T, 'last', 'Last activity')}</tr></thead><tbody>` +
+      sortRows(T, list, val).map(b => `<tr data-act="open-batch" data-b="${esc(b.Batch_No)}"><td><b class="mono">${esc(b.Batch_No)}</b></td><td>${esc(b.Product_Name || b.Part_Code)}<div class="faint mono" style="font-size:11px">${esc(b.Part_Code)}</div></td>
         <td>${esc(b.Customer_Name || '')}</td><td>${statusBadge(b)}</td><td class="num">${fmtNum(b.Total_Qty)}</td><td class="num">${fmtNum(b.Good_Qty)}</td><td class="num">${yieldOf(num(b.Good_Qty), num(b.Reject_Qty))}</td>
         <td>${dt(b.Created_At, false)}</td><td>${ago(b.Last_Activity)}</td></tr>`).join('') + '</tbody></table></div>';
   }
   return `<div class="page-head"><div><p style="margin:0">${plural(list.length, 'batch', 'batches')} shown</p></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-ghost" data-act="export">${ico('download')}Export to Excel</button>${S.D.can.create ? `<button class="btn btn-primary" data-act="new-batch">${ico('plus')}New batch</button>` : ''}</div></div>
     <div class="toolbar"><div class="seg">${segs.map(s => `<button class="${v.batchFilter === s[0] ? 'on' : ''}" data-act="bfilter" data-v="${s[0]}">${s[1]}${s[2] !== undefined ? ` <span class="faint">${s[2]}</span>` : ''}</button>`).join('')}</div>
-      <input class="input" style="max-width:240px;flex:1" id="bSearch" placeholder="Filter by batch, part, customer" value="${esc(v.batchSearch)}">
+      <input class="input" type="search" style="max-width:260px;min-width:200px;flex:1" id="bSearch" placeholder="Filter by batch, part, customer" value="${esc(v.batchSearch)}">
       <select class="input" style="max-width:200px" id="bCustomer"><option value="">All customers</option>${customers.map(c => `<option ${c === v.customer ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select>
       <span class="grow"></span><div class="seg"><button class="${v.batchView === 'board' ? 'on' : ''}" data-act="bview" data-v="board">Board</button><button class="${v.batchView === 'list' ? 'on' : ''}" data-act="bview" data-v="list">List</button></div></div>
     ${body}`;
@@ -1433,6 +1905,11 @@ afterRender.batches = () => {
   const s = $('#bSearch');
   if (s) s.addEventListener('input', debounce(() => { S.view.batchSearch = s.value; const pos = s.selectionStart; render(); const n = $('#bSearch'); n.focus(); n.setSelectionRange(pos, pos); }, 200));
   const c = $('#bCustomer'); if (c) c.addEventListener('change', () => { S.view.customer = c.value; render(); });
+};
+ACT.sort = (el) => {
+  const t = el.dataset.t, k = el.dataset.k, s = S.view.sort[t];
+  S.view.sort[t] = s && s.k === k ? { k, dir: -s.dir } : { k, dir: k === 'at' || k === 'started' || k === 'last' ? -1 : 1 };
+  render();
 };
 ACT.bfilter = (el) => { S.view.batchFilter = el.dataset.v; render(); };
 ACT.bview = (el) => { S.view.batchView = el.dataset.v; render(); };
@@ -1583,34 +2060,66 @@ function renderStage(r) {
   const i = stages().indexOf(st);
   setTitle('Stage ' + st.no, st.name);
   const tab = S.view.stageTab[st.key] || 'record';
+  // Search and filters (1.4.0): the search works on every tab; customer too;
+  // operator, when and PQA apply to the cards already recorded.
+  const F = S.view.stageF[st.key] || (S.view.stageF[st.key] = { q: '', cust: '', op: '', when: '', pqa: '' });
+  const q = F.q.trim().toLowerCase();
+  const bOf = (no) => S.batchBy[no] || {};
+  const hitB = (b, c) => (!F.cust || b.Customer_Name === F.cust) &&
+    (!q || [b.Batch_No, b.Part_Code, b.Product_Name, b.Customer_Name, c && c.Operator, c && nameOf(c.Recorded_By)].join(' ').toLowerCase().indexOf(q) > -1);
+  const since = { today: new Date(new Date().setHours(0, 0, 0, 0)).getTime(), '7': Date.now() - 7 * 864e5, '30': Date.now() - 30 * 864e5,
+                  month: new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime() }[F.when] || 0;
   const open = openBatches().filter(b => info(b).idx === i);
-  const toRecord = open.filter(b => !info(b).waitingPqa);
-  const waiting = open.filter(b => info(b).waitingPqa);
-  const recorded = (S.D.cards[st.key] || []).slice().sort((a, b) => (b.Recorded_At || 0) - (a.Recorded_At || 0));
+  const toRecordAll = open.filter(b => !info(b).waitingPqa), waitingAll = open.filter(b => info(b).waitingPqa);
+  const toRecord = toRecordAll.filter(b => hitB(b)), waiting = waitingAll.filter(b => hitB(b, cardOf(b.Batch_No, st.key)));
+  const recordedAll = (S.D.cards[st.key] || []);
+  const recordedF = recordedAll.filter(c => hitB(bOf(c.Batch_No), c) && (!F.op || c.Operator === F.op) && (!since || cardTime(c) >= since) &&
+    (!F.pqa || (F.pqa === 'signed') === signed(c)));
+  const T = 'stage_' + st.key;
+  const valOf = (c, k) => k === 'batch' ? c.Batch_No : k === 'at' ? cardTime(c) : k === 'total' ? num(c.Total_Qty) : k === 'rej' ? num(c.Reject_Qty) : k === 'good' ? num(c.Good_Qty)
+    : k === 'op' ? c.Operator : k === 'cust' ? bOf(c.Batch_No).Customer_Name : k === 'pqa' ? (signed(c) ? nameOf(c.PQA_By) : '') : (c[k] instanceof Date ? c[k].getTime() : c[k]);
+  const recorded = sortRows(T, recordedF, valOf, { k: 'at', dir: -1 });
+  const customers = Array.from(new Set(open.map(b => b.Customer_Name).concat(recordedAll.map(c => bOf(c.Batch_No).Customer_Name)).filter(Boolean))).sort();
+  const operators = Array.from(new Set(recordedAll.map(c => c.Operator).filter(Boolean))).sort();
+  const filtersOn = !!(F.q || F.cust || F.op || F.when || F.pqa);
   const can = S.D.can;
   let body;
   if (tab === 'record') {
     body = toRecord.length ? '<div class="card"><div class="rows">' + toRecord.map(b => `<div class="row" style="cursor:default">${batchThumb(b)}<div class="r-main"><a href="#/batch/${esc(b.Batch_No)}" style="color:inherit;text-decoration:none"><b class="mono">${esc(b.Batch_No)}</b></a> ${info(b).hold ? '<span class="badge b-bad">On hold</span>' : ''}
         <small>${esc(b.Product_Name || b.Part_Code)} · ${esc(b.Customer_Name || '')} · ${fmtNum(b.Good_Qty)} pieces</small><small>${i === 0 ? 'Opened ' + ago(b.Created_At) : 'Ready since ' + ago(b.Last_Activity)}</small></div>
         ${can.stages[st.key] && !info(b).hold ? `<button class="btn btn-primary btn-sm" data-act="record" data-b="${esc(b.Batch_No)}" data-s="${st.key}">${ico('plus')}Record</button>` : ''}</div>`).join('') + '</div></div>'
-      : '<div class="card empty"><div class="big">✓</div>Nothing to record at ' + esc(st.name) + '.</div>';
+      : toRecordAll.length ? '<div class="card empty">Nothing here matches the search or filters.</div>' : '<div class="card empty"><div class="big">✓</div>Nothing to record at ' + esc(st.name) + '.</div>';
   } else if (tab === 'pqa') {
     body = waiting.length ? '<div class="card"><div class="rows">' + waiting.map(b => { const c = cardOf(b.Batch_No, st.key); return `<div class="row" style="cursor:default">${c && c.Photo_1 ? img(c.Photo_1, 160, 'thumb') : batchThumb(b)}<div class="r-main"><b class="mono">${esc(b.Batch_No)}</b><small>${esc(b.Product_Name || b.Part_Code)} · good ${fmtNum(c && c.Good_Qty)}</small><small>Recorded by ${esc(nameOf(c && c.Recorded_By))} · ${ago(c && c.Recorded_At)}</small></div>
         <a class="btn btn-ghost btn-sm" href="#/batch/${esc(b.Batch_No)}/${st.key}">Review</a>${can.pqa && !info(b).hold ? `<button class="btn btn-ok btn-sm" data-act="pqa-sign" data-b="${esc(b.Batch_No)}" data-s="${st.key}">Sign</button>` : ''}</div>`; }).join('') + '</div></div>'
-      : '<div class="card empty">Nothing waiting for PQA here.</div>';
+      : waitingAll.length ? '<div class="card empty">Nothing here matches the search or filters.</div>' : '<div class="card empty">Nothing waiting for PQA here.</div>';
   } else {
     const cols = st.fields.filter(f => f.type !== 'auto' || st.key === 'WIN').slice(0, 9);
-    body = recorded.length ? `<div class="card tbl-wrap"><table class="tbl"><thead><tr><th>Batch</th><th>Recorded</th><th class="num">Total</th>${st.rejects ? '<th class="num">Rej.</th>' : ''}<th class="num">Good</th><th>Operator</th>${cols.map(f => `<th>${esc(f.label)}</th>`).join('')}<th>PQA</th></tr></thead><tbody>` +
-      recorded.slice(0, 300).map(c => `<tr data-act="open-batch" data-b="${esc(c.Batch_No)}"><td><b class="mono">${esc(c.Batch_No)}</b></td><td>${dt(c.Recorded_At)}</td><td class="num">${fmtNum(c.Total_Qty)}</td>${st.rejects ? `<td class="num" style="${num(c.Reject_Qty) ? 'color:var(--bad)' : ''}">${fmtNum(c.Reject_Qty || 0)}</td>` : ''}<td class="num">${fmtNum(c.Good_Qty)}</td><td>${esc(c.Operator)}</td>
-        ${cols.map(f => `<td>${esc(fieldValue(f, c[f.key]))}</td>`).join('')}<td>${signed(c) ? '<span class="badge b-ok">' + esc(nameOf(c.PQA_By)) + '</span>' : '<span class="badge b-warn">waiting</span>'}</td></tr>`).join('') + '</tbody></table></div>'
-      : '<div class="card empty">No ' + esc(st.name) + ' cards yet.</div>';
+    body = recorded.length ? `<div class="card tbl-wrap"><table class="tbl"><thead><tr>${thSort(T, 'batch', 'Batch')}${thSort(T, 'cust', 'Customer')}${thSort(T, 'at', 'Recorded')}${thSort(T, 'total', 'Total', 'num')}${st.rejects ? thSort(T, 'rej', 'Rej.', 'num') : ''}${thSort(T, 'good', 'Good', 'num')}${thSort(T, 'op', 'Operator')}${cols.map(f => thSort(T, f.key, f.label)).join('')}${thSort(T, 'pqa', 'PQA')}</tr></thead><tbody>` +
+      recorded.slice(0, 500).map(c => `<tr data-act="open-batch" data-b="${esc(c.Batch_No)}"><td><b class="mono">${esc(c.Batch_No)}</b><div class="faint mono" style="font-size:11px">${esc(bOf(c.Batch_No).Part_Code || '')}</div></td><td>${esc(bOf(c.Batch_No).Customer_Name || '')}</td><td>${dt(c.Recorded_At)}</td><td class="num">${fmtNum(c.Total_Qty)}</td>${st.rejects ? `<td class="num" style="${num(c.Reject_Qty) ? 'color:var(--bad)' : ''}">${fmtNum(c.Reject_Qty || 0)}</td>` : ''}<td class="num">${fmtNum(c.Good_Qty)}</td><td>${esc(c.Operator)}</td>
+        ${cols.map(f => `<td>${esc(fieldValue(f, c[f.key]))}</td>`).join('')}<td>${signed(c) ? '<span class="badge b-ok">' + esc(nameOf(c.PQA_By)) + '</span>' : '<span class="badge b-warn">waiting</span>'}</td></tr>`).join('') + '</tbody></table></div>' +
+      (recorded.length > 500 ? `<p class="faint" style="font-size:12px;margin-top:8px">Showing the first 500 of ${fmtNum(recorded.length)}. Search or filter to narrow it.</p>` : '')
+      : recordedAll.length ? '<div class="card empty">No cards match the search or filters.</div>' : '<div class="card empty">No ' + esc(st.name) + ' cards yet.</div>';
   }
   return `<div class="page-head"><div style="display:flex;gap:12px;align-items:center"><div style="width:44px;height:44px;border-radius:12px;background:${STAGE_COLORS[i]};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px">${st.no}</div>
       <div><p style="margin:0">Recorded by: ${esc(st.departments || '—')}${can.stages[st.key] ? '' : ' · <span class="badge b-muted">view only for you</span>'}</p></div></div></div>
     <div class="toolbar"><div class="seg"><button class="${tab === 'record' ? 'on' : ''}" data-act="stab" data-k="${st.key}" data-v="record">To record <span class="faint">${toRecord.length}</span></button>
       <button class="${tab === 'pqa' ? 'on' : ''}" data-act="stab" data-k="${st.key}" data-v="pqa">Waiting PQA <span class="faint">${waiting.length}</span></button>
-      <button class="${tab === 'done' ? 'on' : ''}" data-act="stab" data-k="${st.key}" data-v="done">Recorded <span class="faint">${recorded.length}</span></button></div></div>${body}`;
+      <button class="${tab === 'done' ? 'on' : ''}" data-act="stab" data-k="${st.key}" data-v="done">Recorded <span class="faint">${recordedF.length}${recordedF.length !== recordedAll.length ? ' of ' + recordedAll.length : ''}</span></button></div></div>
+    <div class="toolbar st-filters">
+      <input class="input" type="search" id="stSearch" data-k="${st.key}" placeholder="Search batch, part, customer, operator" value="${esc(F.q)}">
+      <select class="input" data-stf="cust" aria-label="Customer"><option value="">All customers</option>${customers.map(c => `<option ${c === F.cust ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select>
+      ${tab === 'done' ? `<select class="input" data-stf="op" aria-label="Operator"><option value="">All operators</option>${operators.map(o => `<option ${o === F.op ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>
+      <select class="input" data-stf="when" aria-label="When recorded">${[['', 'Any time'], ['today', 'Today'], ['7', 'Last 7 days'], ['30', 'Last 30 days'], ['month', 'This month']].map(o => `<option value="${o[0]}" ${o[0] === F.when ? 'selected' : ''}>${o[1]}</option>`).join('')}</select>
+      <select class="input" data-stf="pqa" aria-label="PQA">${[['', 'PQA: all'], ['signed', 'PQA signed'], ['waiting', 'PQA waiting']].map(o => `<option value="${o[0]}" ${o[0] === F.pqa ? 'selected' : ''}>${o[1]}</option>`).join('')}</select>` : ''}
+      ${filtersOn ? `<button class="btn btn-ghost btn-sm" data-act="stclear" data-k="${st.key}">Clear</button>` : ''}</div>${body}`;
 }
+afterRender.stage = () => {
+  const s = $('#stSearch');
+  if (s) s.addEventListener('input', debounce(() => { const F = S.view.stageF[s.dataset.k]; F.q = s.value; const pos = s.selectionStart; render(); const n = $('#stSearch'); if (n) { n.focus(); n.setSelectionRange(pos, pos); } }, 200));
+  $$('[data-stf]').forEach(sel => sel.addEventListener('change', () => { const k = $('#stSearch').dataset.k; S.view.stageF[k][sel.dataset.stf] = sel.value; render(); }));
+};
+ACT.stclear = (el) => { S.view.stageF[el.dataset.k] = { q: '', cust: '', op: '', when: '', pqa: '' }; render(); };
 ACT.stab = (el) => { S.view.stageTab[el.dataset.k] = el.dataset.v; render(); };
 
 /* =========================================================================
@@ -1780,7 +2289,7 @@ function openBatchForm(batch, pre) {
       <div class="field full"><label>Part code <span class="req">*</span></label><input id="bfPart" list="bfParts" autocomplete="off" value="${esc(edit ? batch.Part_Code : pre.part || '')}" placeholder="Type to search products">
         <datalist id="bfParts">${products.map(p => `<option value="${esc(p.Part_Code)}">${esc(p.Product_Name || '')}</option>`).join('')}</datalist><div class="hint" id="bfProd"></div></div>
       <div class="field full"><label for="bfOrder">For order</label><select id="bfOrder"></select><div class="hint" id="bfOrderHint"></div></div>
-      <div class="field"><label for="bfCust">Customer<span class="af hidden" id="bfCustTag"></span></label><select id="bfCust"><option value="">—</option>${customers.map(c => `<option ${edit && batch.Customer_Name === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></div>
+      <div class="field"><label for="bfCust">Customer<span class="af hidden" id="bfCustTag"></span></label><select id="bfCust"><option value="">No customer</option>${customers.map(c => `<option ${edit && batch.Customer_Name === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></div>
       <div class="field"><label>Total quantity <span class="req">*</span></label><input id="bfQty" type="number" inputmode="numeric" min="1" step="1" value="${esc(edit ? batch.Total_Qty : '')}"><div class="hint" id="bfQtyHint"></div></div>
       ${can.backdate ? `<div class="field"><label>Batch date</label><input id="bfDate" type="datetime-local"><div class="hint">Leave empty for now. Only for paperwork entered late.</div></div>` : ''}
       <div class="field full"><label>Remarks</label><textarea id="bfRemarks" maxlength="1000">${esc(edit ? batch.Remarks : '')}</textarea></div>
@@ -1812,7 +2321,7 @@ function openBatchForm(batch, pre) {
   const fillOrders = () => {
     const p = findProd(), sel = $('#bfOrder', m.el), cur = sel.value || (edit ? batch.Order_Line : pre.line) || '';
     const mine = p ? lines.filter(l => [fgOf(p), String(p.Part_Code).toUpperCase()].indexOf(String(l.fgCode).toUpperCase()) > -1) : [];
-    let opts = '<option value="">— For stock (no order)</option>' + mine.map(l => `<option value="${esc(l.lineId)}">${esc(l.orderNo)} · ${esc(l.customer)} · ${fmtNum(l.qty)}${l.requiredBy ? ' by ' + dt(l.requiredBy).split(',')[0] : ''}${l.priority === 'Urgent' ? ' · URGENT' : ''}</option>`).join('');
+    let opts = '<option value="">For stock (no order)</option>' + mine.map(l => `<option value="${esc(l.lineId)}">${esc(l.orderNo)} · ${esc(l.customer)} · ${fmtNum(l.qty)}${l.requiredBy ? ' by ' + dt(l.requiredBy).split(',')[0] : ''}${l.priority === 'Urgent' ? ' · URGENT' : ''}</option>`).join('');
     if (cur && !mine.some(l => l.lineId === cur) && edit && batch.Order_Line === cur) opts += `<option value="${esc(cur)}">${esc(batch.Order_No)} (closed)</option>`;
     sel.innerHTML = opts; sel.value = mine.some(l => l.lineId === cur) || (edit && batch.Order_Line === cur) ? cur : '';
     sel.disabled = !mine.length && !sel.value;
@@ -1875,12 +2384,12 @@ function fieldInput(f, value, ctx) {
   const hint = `<div class="hint" data-hint="${f.key}">${esc(ctx.hint || '')}</div>`;
   if (f.type === 'auto') return `<div class="field">${lab.replace('<label', '<label data-auto="1"')}<div class="auto" id="${id}">${esc(v) || '—'}</div></div>`;
   if (f.type === 'film') {
-    return `<div class="field">${lab}<select id="${id}" data-key="${f.key}" class="${af}"><option value="">—</option>${S.D.films.map(x => `<option ${String(x.Film) === String(v) ? 'selected' : ''}>${esc(x.Film)}</option>`).join('')}</select></div>`;
+    return `<div class="field">${lab}<select id="${id}" data-key="${f.key}" class="${af}">${blankOption(f.label, f.required)}${S.D.films.map(x => `<option ${String(x.Film) === String(v) ? 'selected' : ''}>${esc(x.Film)}</option>`).join('')}</select></div>`;
   }
   if (f.type === 'list') {
     // A list is picked from, never typed: typing is how "Viran" and "Viren" both end up in the records.
     const opts = mergeOptions(S.D.lists[f.list] || [], ctx.options || [], v ? [String(v)] : []);
-    return `<div class="field">${lab}<select id="${id}" data-key="${f.key}" data-pick="1" class="${af}"><option value="">—</option>${opts.map(o => `<option ${o === String(v) ? 'selected' : ''}>${esc(o)}</option>`).join('')}<option value="__other">Other…</option></select>
+    return `<div class="field">${lab}<select id="${id}" data-key="${f.key}" data-pick="1" class="${af}">${blankOption(f.label, f.required)}${opts.map(o => `<option ${o === String(v) ? 'selected' : ''}>${esc(o)}</option>`).join('')}<option value="__other">Other…</option></select>
       <input id="${id}_o" class="hidden" maxlength="80" placeholder="Type the new ${esc(f.label.toLowerCase())}" style="margin-top:6px">${hint}</div>`;
   }
   if (f.type === 'enum') {
@@ -1898,6 +2407,11 @@ function fieldInput(f, value, ctx) {
   }
   const dl = (ctx.options || []).length ? `<datalist id="${id}_l">${ctx.options.map(o => `<option value="${esc(o)}">`).join('')}</datalist>` : '';
   return `<div class="field">${lab}<input id="${id}" data-key="${f.key}" class="${af}" value="${esc(v)}" maxlength="200" ${dl ? `list="${id}_l" autocomplete="off"` : ''}>${dl}${hint}</div>`;
+}
+// The empty first choice of a drop-down: "Select film" (left out of the open
+// list) where a value is needed, "None" where it may be left empty.
+function blankOption(label, required) {
+  return required ? `<option value="" hidden>Select ${esc(String(label).toLowerCase())}</option>` : '<option value="">None</option>';
 }
 function mergeOptions() {
   const seen = {}, out = [];
@@ -1988,7 +2502,7 @@ async function openCardForm(batchNo, stageKey, editing) {
       ${allOk.length > 1 && !existing ? `<button type="button" class="btn btn-ghost btn-sm" id="cfAllOk" style="margin-bottom:10px">${ico('check')} All checks OK</button>` : ''}
       <div class="form-grid">${st.fields.map(f => fieldInput(f, filled[f.key].v, ctxOf(f))).join('')}
         <div class="field"><label for="cfOperator">Operator <span class="req">*</span>${opSrc ? `<span class="af">${esc(opSrc)}</span>` : ''}</label>
-          <select id="cfOperator" data-pick="1" class="${opSrc ? 'af-on' : ''}"><option value="">—</option>${mergeOptions(opList, operator ? [operator] : []).map(o => `<option ${o === operator ? 'selected' : ''}>${esc(o)}</option>`).join('')}<option value="__other">Other…</option></select>
+          <select id="cfOperator" data-pick="1" class="${opSrc ? 'af-on' : ''}">${blankOption('operator', true)}${mergeOptions(opList, operator ? [operator] : []).map(o => `<option ${o === operator ? 'selected' : ''}>${esc(o)}</option>`).join('')}<option value="__other">Other…</option></select>
           <input id="cfOperator_o" class="hidden" maxlength="80" placeholder="Operator's name" style="margin-top:6px"></div></div>
       <div class="fsec">Photos</div>
       <div class="capture">${st.photos.map(p => `<div class="cap" data-photo="${p.key}" tabindex="0">${ico('cam')}<span>${esc(p.label)}</span></div>`).join('')}</div>
@@ -2459,7 +2973,7 @@ ACT.ddedit = async (el, e) => {
        ['Film', 'Film', 'select', false, S.D.films.map(f => f.Film)], ['Core_Size', 'Core size', 'list', false, 'Core Sizes'], ['Can_Size', 'Can size', 'list', false, 'Can Sizes'], ['Stock_FG_Code', 'Stock FG code (if different)', 'fg']];
   const input = (f) => {
     const v = rec[f[0]] || '';
-    if (f[2] === 'select') return `<select id="dd_${f[0]}"><option value="">—</option>${f[4].map(o => `<option ${o === v ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
+    if (f[2] === 'select') return `<select id="dd_${f[0]}">${blankOption(f[1], f[3])}${f[4].map(o => `<option ${o === v ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
     if (f[2] === 'list') return `<input id="dd_${f[0]}" list="dd_${f[0]}_l" value="${esc(v)}" autocomplete="off"><datalist id="dd_${f[0]}_l">${(S.D.lists[f[4]] || []).map(o => `<option value="${esc(o)}">`).join('')}</datalist>`;
     if (f[2] === 'fg') return `<input id="dd_${f[0]}" list="dd_fg_l" value="${esc(v)}" autocomplete="off" placeholder="Only if Stock uses another code"><datalist id="dd_fg_l"></datalist>`;
     return `<input id="dd_${f[0]}" value="${esc(v)}" maxlength="120">`;
@@ -2490,6 +3004,7 @@ ACT.ddedit = async (el, e) => {
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
   S.session = load(SESSION_KEY, true);
   if (!S.session || !S.session.token) { showLogin(''); return; }
+  handleNotifLink();
   showSplash();
   start();
 })();
