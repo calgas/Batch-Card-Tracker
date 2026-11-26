@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
-<meta name="app-version" content="1.5.4">
+<meta name="app-version" content="1.5.5">
 <meta name="theme-color" content="#15181d">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -253,8 +253,10 @@
   .notif-head h4 { margin: 0; font-size: 15px; flex: 1; }
   .notif-head .btn { min-height: 0; padding: 6px 10px; font-size: 12.5px; }
   .notif-list { overflow-y: auto; flex: 1; overscroll-behavior: contain; }
-  .notif-item { display: block; width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--line-soft); background: transparent; font: inherit; color: var(--ink);
-                padding: 11px 16px 11px 30px; cursor: pointer; position: relative; }
+  .notif-item { display: flex; align-items: flex-start; width: 100%; border-bottom: 1px solid var(--line-soft); position: relative; }
+  .notif-item .notif-open { display: block; flex: 1; min-width: 0; text-align: left; border: 0; background: transparent; font: inherit; color: var(--ink); cursor: pointer; padding: 11px 6px 11px 30px; }
+  .notif-x { flex: 0 0 30px; width: 30px; height: 30px; margin: 8px 8px 0 0; border: 0; border-radius: 8px; background: transparent; color: var(--ink-soft); font-size: 13px; cursor: pointer; opacity: .55; }
+  .notif-x:hover, .notif-x:focus-visible { opacity: 1; background: var(--bad-soft); color: var(--bad); }
   .notif-item:hover { background: var(--hover); }
   .notif-item.unread::before { content: ''; position: absolute; left: 13px; top: 17px; width: 8px; height: 8px; border-radius: 50%; background: var(--copper); }
   .notif-item b { display: block; font-size: 13.5px; }
@@ -1014,7 +1016,7 @@ const AppPrompts = (function () {
    behind the figures already on screen.
    ========================================================================= */
 
-const APP_VERSION = '1.5.4';
+const APP_VERSION = '1.5.5';
 const BCT_API_URL = 'https://script.google.com/macros/s/AKfycbxdCU4dK92I_Q5mlzhp9cEw_efeX5bVfkfLfqbNf_5eDpyj1RljUh0WqO-Y5-t3RhNZ/exec';
 const STOCK_API_URL = 'https://script.google.com/macros/s/AKfycbzs_aW0G-NvVvs-_Yk41d4esq1lkKVBTzQEQTrbbIKe7kQfoYdXD3cuhd6Wt2UQ6MU0/exec';
 const APP_URL = 'https://calgas.github.io/Batch-Card-Tracker/';
@@ -1787,14 +1789,20 @@ function sugAdopt(input) {
   input.classList.add('sug-in');
 }
 function sugAdoptAll(root) { (root.querySelectorAll ? Array.from(root.querySelectorAll('input[list]')) : []).forEach(sugAdopt); if (root.matches && root.matches('input[list]')) sugAdopt(root); }
+// A–Z, with numbers in order (2 before 10), ignoring case.
+const AZ = new Intl.Collator('en', { numeric: true, sensitivity: 'base' });
+function azCmp(a, b) { return AZ.compare(String(a === null || a === undefined ? '' : a), String(b === null || b === undefined ? '' : b)); }
 function sugOptions(input) {
   const dl = document.getElementById(input.dataset.sug);
   if (!dl) return [];
-  return Array.from(dl.querySelectorAll('option')).map(o => {
+  const opts = Array.from(dl.querySelectorAll('option')).map(o => {
     const v = (o.getAttribute('value') !== null ? o.getAttribute('value') : o.textContent).trim();
     const txt = (o.getAttribute('label') || o.textContent || '').trim();
     return { v, t: txt && txt !== v ? txt : '' };
   }).filter(o => o.v);
+  // Every list opens A–Z (1.5.5); data-sort="none" keeps a list's own order.
+  if (dl.dataset.sort !== 'none') opts.sort((a, b) => azCmp(a.v, b.v));
+  return opts;
 }
 function sugPanel() {
   if (SUG.panel) return SUG.panel;
@@ -1977,11 +1985,25 @@ function renderNotifPanel() {
   if (!p) return;
   const items = NOTIF.items;
   p.innerHTML = '<div class="notif-head"><h4>Notifications</h4>' + (NOTIF.unread ? '<button class="btn btn-ghost" data-nf="all">Mark all read</button>' : '') +
+    (items.length ? '<button class="btn btn-ghost" data-nf="clear">Clear all</button>' : '') +
     '<button class="icon-btn" data-nf="close" aria-label="Close">' + ico('x') + '</button></div>' +
     '<div class="notif-list">' + (items.length ? items.map(n =>
-      `<button class="notif-item${n.Read_At ? '' : ' unread'}" data-nid="${esc(n.ID)}"><b>${esc(n.Title)}</b>${n.Body ? `<span>${esc(n.Body)}</span>` : ''}<time>${esc(notifAgo(n.Created_At))}</time></button>`).join('')
+      // The ✕ removes it from the list for good (1.5.5).
+      `<div class="notif-item${n.Read_At ? '' : ' unread'}" data-nid="${esc(n.ID)}"><button type="button" class="notif-open"><b>${esc(n.Title)}</b>${n.Body ? `<span>${esc(n.Body)}</span>` : ''}<time>${esc(notifAgo(n.Created_At))}</time></button>` +
+      `<button type="button" class="notif-x" data-nx="${esc(n.ID)}" title="Remove" aria-label="Remove this notification">&#10005;</button></div>`).join('')
       : `<div class="notif-empty">${NOTIF.loadedAt ? 'Nothing yet. Cards waiting for your PQA sign-off, holds, cards sent back and finished batches show up here.' : 'Loading…'}</div>`) + '</div>' +
     '<div class="notif-foot">' + pushFootHtml() + '</div>';
+}
+// The ✕ on one (ids) or Clear all (null): gone from the list at once, and from the server behind it.
+function dismissNotifs(ids) {
+  const gone = NOTIF.items.filter(x => !ids || ids.indexOf(x.ID) > -1);
+  NOTIF.items = ids ? NOTIF.items.filter(x => ids.indexOf(x.ID) === -1) : [];
+  NOTIF.unread = Math.max(0, NOTIF.unread - gone.filter(x => !x.Read_At).length);
+  syncNotifBadge();
+  if (notifOpen()) renderNotifPanel();
+  api('dismissNotifications', ids ? { ids } : { all: true })
+    .then(d => { if (d && typeof d.unread === 'number') { NOTIF.unread = d.unread; syncNotifBadge(); } })
+    .catch(e => { toast(e.message, true); loadNotifications(true); });
 }
 function markNotifRead(ids) {
   let n = 0;
@@ -2002,6 +2024,8 @@ function openNotifLink(link) {
   refresh(true);
 }
 async function onNotifPanelClick(e) {
+  const x = e.target.closest('[data-nx]');
+  if (x) { dismissNotifs([x.dataset.nx]); return; }
   const item = e.target.closest('[data-nid]');
   if (item) {
     const n = NOTIF.items.find(x => x.ID === item.dataset.nid);
@@ -2016,6 +2040,7 @@ async function onNotifPanelClick(e) {
   const a = b.dataset.nf;
   if (a === 'close') toggleNotifPanel(false);
   else if (a === 'all') markNotifRead(null);
+  else if (a === 'clear') dismissNotifs(null);
   else if (a === 'on') enablePush(b);
   else if (a === 'off') disablePush(b);
   else if (a === 'test') {
@@ -2283,7 +2308,7 @@ function renderBatches() {
   if (location.hash.indexOf('?stuck') > -1) { S.view.batchFilter = 'stuck'; history.replaceState(null, '', '#/batches'); }
   const v = S.view;
   const list = filteredBatches();
-  const customers = Array.from(new Set(S.D.batches.map(b => b.Customer_Name).filter(Boolean))).sort();
+  const customers = Array.from(new Set(S.D.batches.map(b => b.Customer_Name).filter(Boolean))).sort(azCmp);
   const counts = { open: 0, pqa: 0, hold: 0, stuck: 0, done: 0 };
   S.D.batches.forEach(b => { const i = info(b); if (i.open) counts.open++; if (i.open && i.waitingPqa) counts.pqa++; if (i.open && i.hold) counts.hold++; if (i.stuck) counts.stuck++; if (i.done) counts.done++; });
   const segs = [['open', 'Open', counts.open], ['pqa', 'Waiting PQA', counts.pqa], ['hold', 'On hold', counts.hold], ['stuck', 'Not moving', counts.stuck], ['done', 'Completed', counts.done], ['all', 'All', S.D.batches.length]];
@@ -2492,8 +2517,8 @@ function renderStage(r) {
   const valOf = (c, k) => k === 'batch' ? c.Batch_No : k === 'at' ? cardTime(c) : k === 'total' ? num(c.Total_Qty) : k === 'rej' ? num(c.Reject_Qty) : k === 'good' ? num(c.Good_Qty)
     : k === 'op' ? c.Operator : k === 'cust' ? bOf(c.Batch_No).Customer_Name : k === 'pqa' ? (signed(c) ? nameOf(c.PQA_By) : '') : (c[k] instanceof Date ? c[k].getTime() : c[k]);
   const recorded = sortRows(T, recordedF, valOf, { k: 'at', dir: -1 });
-  const customers = Array.from(new Set(open.map(b => b.Customer_Name).concat(recordedAll.map(c => bOf(c.Batch_No).Customer_Name)).filter(Boolean))).sort();
-  const operators = Array.from(new Set(recordedAll.map(c => c.Operator).filter(Boolean))).sort();
+  const customers = Array.from(new Set(open.map(b => b.Customer_Name).concat(recordedAll.map(c => bOf(c.Batch_No).Customer_Name)).filter(Boolean))).sort(azCmp);
+  const operators = Array.from(new Set(recordedAll.map(c => c.Operator).filter(Boolean))).sort(azCmp);
   const filtersOn = !!(F.q || F.cust || F.op || F.when || F.pqa);
   const can = S.D.can;
   let body;
@@ -2695,7 +2720,7 @@ function sigPadHtml(id, hint) {
 function openBatchForm(batch, pre) {
   const can = S.D.can, edit = !!batch;
   pre = pre || {};
-  const products = S.D.products.slice().sort((a, b) => String(a.Part_Code).localeCompare(String(b.Part_Code)));
+  const products = S.D.products.slice().sort((a, b) => azCmp(a.Part_Code, b.Part_Code));
   const customers = S.D.lists.Customers || [];
   // A batch opened before elements per capacitor: its quantity stays as entered unless the elements are set.
   const legacy = edit && !hasPerCap(batch);
@@ -2795,7 +2820,7 @@ function openBatchForm(batch, pre) {
   const inBatches = (id) => S.D.batches.filter(x => x.Order_Line === id && x.Status !== 'Void' && (!edit || x.Batch_No !== batch.Batch_No)).reduce((t, x) => t + num(x.Total_Qty), 0);
   const fillOrders = () => {
     const p = findProd(), sel = $m('#bfOrder'), cur = sel.value || (edit ? batch.Order_Line : pre.line) || '';
-    const mine = p ? lines.filter(l => [fgOf(p), String(p.Part_Code).toUpperCase()].indexOf(String(l.fgCode).toUpperCase()) > -1) : [];
+    const mine = p ? lines.filter(l => [fgOf(p), String(p.Part_Code).toUpperCase()].indexOf(String(l.fgCode).toUpperCase()) > -1).sort((a, b) => azCmp(a.orderNo, b.orderNo)) : [];
     let opts = '<option value="">For stock (no order)</option>' + mine.map(l => `<option value="${esc(l.lineId)}">${esc(l.orderNo)} · ${esc(l.customer)} · ${fmtNum(l.qty)}${l.requiredBy ? ' by ' + dt(l.requiredBy).split(',')[0] : ''}${l.priority === 'Urgent' ? ' · URGENT' : ''}</option>`).join('');
     if (cur && !mine.some(l => l.lineId === cur) && edit && batch.Order_Line === cur) opts += `<option value="${esc(cur)}">${esc(batch.Order_No)} (closed)</option>`;
     sel.innerHTML = opts; sel.value = mine.some(l => l.lineId === cur) || (edit && batch.Order_Line === cur) ? cur : '';
@@ -3582,7 +3607,7 @@ function renderDropdowns() {
   if (cur === 'Products') {
     body = `<div class="card"><div class="card-head"><div><h3>Products</h3><p>Choosing a part code on a new batch fills these in. “Stock FG code” links it to Stock Management when the part code differs.</p></div><button class="btn btn-primary btn-sm" data-act="ddedit" data-k="product">${ico('plus')}Add product</button></div>
       <div class="tbl-wrap" style="margin-top:12px"><table class="tbl"><thead><tr><th>Part code</th><th>Product</th><th>Rating</th><th>Voltage</th><th>Winding MFD</th><th class="num">Elements</th><th>Connection</th><th>Film</th><th>Core</th><th>Can</th><th>Stock FG code</th><th></th></tr></thead><tbody>
-      ${S.D.products.slice().sort((a, b) => String(a.Part_Code).localeCompare(String(b.Part_Code))).map(p => `<tr data-act="ddedit" data-k="product" data-id="${esc(p.Row_ID)}"><td class="mono"><b>${esc(p.Part_Code)}</b></td><td>${esc(p.Product_Name)}</td><td>${esc(p.Rating)}</td><td>${esc(p.Voltage)}</td><td>${esc(p.Winding_MFD)}</td><td class="num">${esc(p.Elements_Per_Cap)}</td><td>${esc(p.Connection)}</td><td>${esc(p.Film)}</td><td>${esc(p.Core_Size)}</td><td>${esc(p.Can_Size)}</td><td class="mono">${esc(p.Stock_FG_Code)}</td>
+      ${S.D.products.slice().sort((a, b) => azCmp(a.Part_Code, b.Part_Code)).map(p => `<tr data-act="ddedit" data-k="product" data-id="${esc(p.Row_ID)}"><td class="mono"><b>${esc(p.Part_Code)}</b></td><td>${esc(p.Product_Name)}</td><td>${esc(p.Rating)}</td><td>${esc(p.Voltage)}</td><td>${esc(p.Winding_MFD)}</td><td class="num">${esc(p.Elements_Per_Cap)}</td><td>${esc(p.Connection)}</td><td>${esc(p.Film)}</td><td>${esc(p.Core_Size)}</td><td>${esc(p.Can_Size)}</td><td class="mono">${esc(p.Stock_FG_Code)}</td>
         <td><button class="icon-btn" data-act="dddel" data-k="product" data-id="${esc(p.Row_ID)}" title="Delete">${ico('trash')}</button></td></tr>`).join('')}</tbody></table></div></div>`;
   } else if (cur === 'Films') {
     body = `<div class="card"><div class="card-head"><div><h3>Films</h3><p>Choosing the film on Winding fills micron, width, margin, type and resistivity.</p></div><button class="btn btn-primary btn-sm" data-act="ddedit" data-k="film">${ico('plus')}Add film</button></div>
@@ -3616,7 +3641,7 @@ ACT.ddedit = async (el, e) => {
   if (e.target.closest('[data-act=dddel]')) return;
   const kind = el.dataset.k, rec = el.dataset.id ? (kind === 'film' ? S.D.films : S.D.products).find(x => x.Row_ID === el.dataset.id) : {};
   const fieldsDef = kind === 'film'
-    ? [['Film', 'Film', 'text', true], ['Micron', 'Micron'], ['Width', 'Width'], ['Free_Margin', 'Free margin'], ['Film_Type', 'Film type', 'select', false, ['SERIES', 'STANDARD', 'SLOPE WC', 'WAVE CUT']], ['Film_Resistivity', 'Film resistivity']]
+    ? [['Film', 'Film', 'text', true], ['Micron', 'Micron'], ['Width', 'Width'], ['Free_Margin', 'Free margin'], ['Film_Type', 'Film type', 'select', false, ['SERIES', 'SLOPE WC', 'STANDARD', 'WAVE CUT']], ['Film_Resistivity', 'Film resistivity']]
     : [['Part_Code', 'Part code', 'text', true], ['Product_Name', 'Product name'], ['Rating', 'Rating', 'list', false, 'Ratings'], ['Voltage', 'Voltage', 'list', false, 'Voltages'], ['Winding_MFD', 'Winding element MFD', 'list', false, 'Winding MFD'],
        ['Elements_Per_Cap', 'Elements per capacitor', 'int'], ['Connection', 'Connection', 'list', false, 'Connections'],
        ['Film', 'Film', 'film'], ['Core_Size', 'Core size', 'list', false, 'Core Sizes'], ['Can_Size', 'Can size', 'list', false, 'Can Sizes'], ['Stock_FG_Code', 'Stock FG code (if different)', 'fg']];
