@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
-<meta name="app-version" content="1.5.6">
+<meta name="app-version" content="1.5.7">
 <meta name="theme-color" content="#15181d">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -1044,7 +1044,7 @@ const AppPrompts = (function () {
    behind the figures already on screen.
    ========================================================================= */
 
-const APP_VERSION = '1.5.6';
+const APP_VERSION = '1.5.7';
 const BCT_API_URL = 'https://script.google.com/macros/s/AKfycbxdCU4dK92I_Q5mlzhp9cEw_efeX5bVfkfLfqbNf_5eDpyj1RljUh0WqO-Y5-t3RhNZ/exec';
 const STOCK_API_URL = 'https://script.google.com/macros/s/AKfycbzs_aW0G-NvVvs-_Yk41d4esq1lkKVBTzQEQTrbbIKe7kQfoYdXD3cuhd6Wt2UQ6MU0/exec';
 const APP_URL = 'https://calgas.github.io/Batch-Card-Tracker/';
@@ -1373,7 +1373,7 @@ function nextSerial(batchNo) {
   return { v: SERIAL_MONTHS[now.getMonth()] + '0001', src: 'New month' };
 }
 function receiptOf(batchNo) { return S.D.orders && S.D.orders.receipts ? S.D.orders.receipts[String(batchNo).toUpperCase()] || null : null; }
-const OD_URL = 'https://calgas.github.io/Production-Tracker/';
+const OD_URL = 'https://calgas.github.io/Orders-Dispatch/';
 function pastValue(stageKey, batchNo, key, wide) {
   const c = pastCards(stageKey, batchNo, wide).find(x => !blankV(x[key]));
   return c ? { v: c[key], from: c.Batch_No } : null;
@@ -2690,7 +2690,7 @@ ACT.stab = (el) => { S.view.stageTab[el.dataset.k] = el.dataset.v; render(); };
    ========================================================================= */
 const APP_GALLERY = [
   ['Stock Management', 'RM, FG and Trade stock', 'https://calgas.github.io/Stock-Management/', '#b5652e', 'SM'],
-  ['Orders & Dispatch', 'Orders, stores receipts and dispatches', 'https://calgas.github.io/Production-Tracker/', '#3e6e97', 'OD'],
+  ['Orders & Dispatch', 'Orders, stores receipts and dispatches', 'https://calgas.github.io/Orders-Dispatch/', '#3e6e97', 'OD'],
   ['CALGAS Workforce', 'People and attendance', 'https://calgas.github.io/Workforce/', '#3f9e73', 'WF'],
   ['Calgas Tasks', 'Tasks and follow-ups', 'https://calgas.github.io/Tasks/', '#6b5fa8', 'TK'],
   ['calgascapacitors.com', 'Company website', 'https://calgascapacitors.com/', '#1c2024', 'CC']
